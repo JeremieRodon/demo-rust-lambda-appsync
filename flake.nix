@@ -28,6 +28,7 @@
         dependencies = with pkgs; [
           jdk21 # For local-dynamoddb
 	  python312Packages.boto3 # Allow Python scripts for interacting with AWS
+	  cargo-lambda # Run lambdas locally
         ];
       in
         with pkgs; {
