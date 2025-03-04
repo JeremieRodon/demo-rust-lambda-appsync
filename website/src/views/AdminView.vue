@@ -6,7 +6,7 @@ const signed_admin = inject('signed_admin');
 
 <template>
   <main>
-    <h1 class="text-4xl my-6 font-black text-center">Administration</h1>
+    <h1 class="text-4xl my-6 font-black text-center">Admin</h1>
     {{ signed_admin }}
   </main>
 </template>

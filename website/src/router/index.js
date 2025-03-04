@@ -1,13 +1,29 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { getCurrentUser, signIn } from 'aws-amplify/auth';
-import MainView from '@/views/MainView.vue';
+
 import AdminView from '@/views/AdminView.vue';
+import MainLayout from '@/layouts/MainLayout.vue';
+import LeaderBoard from '@/views/LeaderBoard.vue';
+import GameView from '@/views/GameView.vue';
 
 const routes = [
   {
     path: '/',
-    name: 'main',
-    component: MainView,
+    name: 'mainlayout',
+    component: MainLayout,
+    children: [
+      { path: '/', redirect: { name: 'game' } },
+      {
+        path: '/game',
+        name: 'game',
+        component: GameView,
+      },
+      {
+        path: '/leaderboard',
+        name: 'leaderboard',
+        component: LeaderBoard,
+      },
+    ],
   },
   {
     path: '/admin',

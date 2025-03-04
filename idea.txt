@@ -1,0 +1,40 @@
+Benchmark Game
+
+Un API GraphQL avec une mutation "AddOne" qui ajoute simplement 1 à un compteur DynamoDB
+La mutation est déclinée en 3 versions:
+ - Rust Lambda Direct Invocation
+ - Javascript
+ - VTL
+Chacune de ces versions met à jour son propre compteur dans DynamoDB.
+
+Côté frontend, chaque utilisateur qui se connecte génère un ID et est assigné à une des trois team suivantes:
+ - Team Rust
+ - Team JS
+ - Team VTL
+L'interface fourni un simple bouton "ADD ONE!!".
+Quand le jeu démarre, le bouton devient actif et appelle la mutation correspondant à la team de l'utilisateur.
+Le bouton se désactive pendant le "roundtrip" de la requête et redevient actif après.
+Le but sera évidemment de cliquer comme un teuteu sur le bouton.
+Le front-end garde trace et reporte le RTT moyen de chaque requete.
+
+Les statistiques suivantes sont affichées en temps réel à tous les utilisateurs:
+Pour chaque Team/Mutation:
+ - nombre de joueurs
+ - état du compteur
+ - RTT moyen de tous les joueurs
+
+Pour moi (admin):
+- Possibilité de démarrer/arrêter le jeu
+- Possibilité de reset le jeu.
+- Leaderboard utilisateur?
+
+Pour les utilisateurs:
+ - Possibilité de choisir un pseudo?
+
+
+
+ DynamoDB:
+ Player:
+    Id Name Team ClickCount AvgLatency => Query by username / List all users
+ GameState:
+    GAMESTATE GAMESTATE state
