@@ -6,14 +6,6 @@ Parameters:
   ProjectName:
     Type: String
 
-Globals:
-  Function:
-    Handler: index.lambda_handler
-    Runtime: python3.13
-    MemorySize: 128
-    Architectures:
-      - arm64
-
 Resources:
   ############################
   # S3 Static Website Bucket #
@@ -73,6 +65,11 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub lambda-${ProjectName}-cleanup-s3
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      MemorySize: 128
+      Architectures:
+        - arm64
       Events:
         TriggerEvent:
           Type: S3

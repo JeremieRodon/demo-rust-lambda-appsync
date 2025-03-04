@@ -80,6 +80,11 @@ Resources:
     Properties:
       FunctionName: !Sub lambda-${ProjectName}-s3-bucket-emptier
       Description: Called by a CF Custom Resource to empty an S3 bucket before destroying it
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      MemorySize: 128
+      Architectures:
+        - arm64
       InlineCode: |
         import boto3
         import cfnresponse
@@ -121,14 +126,14 @@ Resources:
     Type: AWS::CodeBuild::Project
     DependsOn:
       - ArtifactBucketEmptier
-      - BuildProjectLogGroup
+      - InfraBuildProjectLogGroup
     Properties:
       Name: !Sub cbp-${ProjectName}-infra-builder
       Description: !Sub Project building infra for the project ${ProjectName}
       ServiceRole: !GetAtt BuildProjectsRole.Arn
       Environment:
         Type: ARM_CONTAINER
-        ComputeType: BUILD_GENERAL1_MEDIUM
+        ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/amazonlinux2-aarch64-standard:3.0
         EnvironmentVariables:
           - Name: ARTIFACT_BUCKET
@@ -222,7 +227,7 @@ Resources:
   ############
   # Pipeline #
   ############
-  PipeLineRole:
+  PipelineRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub codepipeline-${ProjectName}
@@ -283,7 +288,7 @@ Resources:
       - ArtifactBucketEmptier
       - BuildProjectsRolePolicy
     Properties:
-      RoleArn: !GetAtt PipeLineRole.Arn
+      RoleArn: !GetAtt PipelineRole.Arn
       Name: !Sub release-${ProjectName}
       PipelineType: V2
       Stages:
@@ -442,4 +447,4 @@ Outputs:
     Description: Arn of the Lambda used as a CFN Custom Resource to empty buckets
     Value: !GetAtt BucketEmptierLambda.Arn
     Export:
-      Name: CustomResource:${ProjectName}:S3BucketEmptier
+      Name: !Sub CustomResource:${ProjectName}:S3BucketEmptier
