@@ -177,8 +177,8 @@ phases:
         done
       - |
         echo Packaging the root-template file references...
-        mv root-template.yml root-template.yml.bak
-        aws cloudformation package --template-file root-template.yml.bak --s3-bucket $ARTIFACT_BUCKET --s3-prefix templates --output-template-file root-template.yml
+        mv demo-root-template.yml demo-root-template.yml.bak
+        aws cloudformation package --template-file demo-root-template.yml.bak --s3-bucket $ARTIFACT_BUCKET --s3-prefix templates --output-template-file demo-root-template.yml
     finally:
       - echo Exiting the post_build phase on `date`
 artifacts:
