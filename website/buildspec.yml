@@ -1,0 +1,50 @@
+version: 0.2
+env:
+  exported-variables:
+    - STATIC_WEB_BUCKET
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+  pre_build:
+    commands:
+      - echo Entered the pre_build phase on `date`
+      - |
+        npm install --production=false
+      - |
+        export VITE_AWS_REGION=$AWS_REGION
+        echo Exporting CloudFormation infra outputs
+        export STATIC_WEB_BUCKET=$(jq -r '.StaticWebBucket' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+        export VITE_WEBSITE_URL=$(jq -r '.WebsiteUrl' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+        export VITE_COGNITO_USER_POOL_ID=$(jq -r '.CognitoUserPoolId' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+        export VITE_COGNITO_USER_POOL_WEB_CLIENT_ID=$(jq -r '.CognitoUserPoolClientId' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+        export VITE_COGNITO_DOMAIN=$(jq -r '.CognitoDomainName' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+        export VITE_GRAPHQLAPI_URL=$(jq -r '.GraphQLApiUrl' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+        export VITE_GRAPHQLAPI_KEY=$(jq -r '.GraphQLApiKey' < $CODEBUILD_SRC_DIR_DeployInfraOutput/infra.outputs.json)
+    finally:
+      - echo Exiting the pre_build phase on `date`
+  build:
+    commands:
+      - echo Entered the build phase on `date`
+      - npm run lint
+      - npm run build
+    finally:
+      - echo Exiting the build phase on `date`
+  post_build:
+    commands:
+      - echo Entered the post_build phase on `date`
+    finally:
+      - echo Exiting the post_build phase on `date`
+artifacts:
+  secondary-artifacts:
+    StaticContent:
+      base-directory: ./dist
+      files:
+        - '**/*'
+      exclude-paths:
+        - index.html
+    DynamicContent:
+      base-directory: ./dist
+      files:
+        - index.html
+discard-paths: no

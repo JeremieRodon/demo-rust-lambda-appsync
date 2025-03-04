@@ -1,0 +1,72 @@
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type Query {
+  gameState: GameState!
+    @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    @aws_api_key
+}
+
+type Mutation {
+  startGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
+  stopGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
+  resetGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
+  registerNewPlayer(name: String!): Player! @aws_api_key
+  updatePlayerName(new_name: String!): Player! @aws_api_key
+  click(player_id: ID!): Player! @aws_api_key
+  reportLatency(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
+}
+
+type Subscription {
+  updatedPlayer: Player
+    @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    @aws_api_key
+    @aws_subscribe(
+      mutations: [
+        "registerNewPlayer"
+        "updatePlayerName"
+        "click"
+        "reportLatency"
+      ]
+    )
+  updatedGameStatus: GameStatus
+    @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    @aws_api_key
+    @aws_subscribe(mutations: ["startGame", "stopGame", "resetGame"])
+}
+
+enum GameStatus {
+  STARTED
+  STOPPED
+  RESET
+}
+
+enum Team {
+  RUST
+  JS
+  VTL
+}
+
+type Player @aws_cognito_user_pools(cognito_groups: ["Admins"]) @aws_api_key {
+  id: ID!
+  name: String!
+  team: Team!
+  clicks: Int
+  avg_latency: Float
+  avg_latency_clicks: Int
+}
+
+input LatencyReport {
+  clicks: Int!
+  avg_latency: Float!
+}
+
+type GameState
+  @aws_cognito_user_pools(cognito_groups: ["Admins"])
+  @aws_api_key {
+  status: GameStatus!
+  players: [Player!]!
+}

@@ -27,8 +27,9 @@
         rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
         dependencies = with pkgs; [
           jdk21 # For local-dynamoddb
-	  python312Packages.boto3 # Allow Python scripts for interacting with AWS
-	  cargo-lambda # Run lambdas locally
+          nodejs_22 # For frontend
+          python312Packages.boto3 # Allow Python scripts for interacting with AWS
+          cargo-lambda # Run lambdas locally
         ];
       in
         with pkgs; {
