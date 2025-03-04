@@ -186,7 +186,7 @@ artifacts:
     Infra:
       base-directory: .
       files:
-        - root-template.yml
+        - demo-root-template.yml
     Website:
       base-directory: website
       files:
