@@ -6,8 +6,15 @@ import router from '@/router';
 import { getUserInfos } from './modules/utils';
 import AlertDisplay from './components/AlertDisplay.vue';
 
-const signed_admin = ref(null);
-provide('signed_admin', signed_admin);
+const signed_user = ref(null);
+provide('signed_user', signed_user);
+
+const registered_player_id = ref(null);
+provide('registered_player_id', registered_player_id);
+watch(registered_player_id, () => {
+  // Save the theme choice
+  window.localStorage.setItem('user_id', registered_player_id.value);
+});
 
 // By default, we go in darkmode
 // that is: unless the user previously explicitly set "light"
@@ -23,16 +30,16 @@ Hub.listen('auth', ({ payload }) => {
   switch (payload.event) {
     case 'signedIn':
       console.log('user have been signedIn successfully.');
-      verify_admin_signed_in();
+      verify_user_signed_in();
       break;
     case 'signedOut':
       console.log('user have been signedOut successfully.');
-      verify_admin_signed_in();
+      verify_user_signed_in();
       router.push(router.resolve('/'));
       break;
     case 'tokenRefresh':
       console.log('auth tokens have been refreshed.');
-      verify_admin_signed_in();
+      verify_user_signed_in();
       break;
     case 'tokenRefresh_failure':
       console.log('failure while refreshing auth tokens.');
@@ -49,19 +56,24 @@ Hub.listen('auth', ({ payload }) => {
   }
 });
 
-async function verify_admin_signed_in() {
+async function verify_user_signed_in() {
   try {
-    signed_admin.value = await getUserInfos();
-    console.log(signed_admin.value);
+    signed_user.value = await getUserInfos();
+    console.log(signed_user.value);
     return true;
   } catch {
-    signed_admin.value = null;
+    signed_user.value = null;
     return false;
   }
 }
 
+async function verify_registration() {
+  registered_player_id.value = window.localStorage.getItem('user_id');
+}
+
 onMounted(async () => {
-  await verify_admin_signed_in();
+  await verify_user_signed_in();
+  verify_registration();
 });
 </script>
 

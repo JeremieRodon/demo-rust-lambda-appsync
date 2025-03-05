@@ -1,0 +1,18 @@
+[package]
+name = "shared_types"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aws-sdk-dynamodb = { workspace = true }
+
+serde = { workspace = true }
+serde_dynamo = { workspace = true }
+
+uuid = { workspace = true }
+
+log = { workspace = true }

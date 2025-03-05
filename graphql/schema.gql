@@ -16,6 +16,8 @@ type Mutation {
   resetGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
   registerNewPlayer(name: String!): Player! @aws_api_key
   updatePlayerName(new_name: String!): Player! @aws_api_key
+  removePlayer(player_id: ID!): Player!
+    @aws_cognito_user_pools(cognito_groups: ["Admins"])
   click(player_id: ID!): Player! @aws_api_key
   reportLatency(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
 }
@@ -32,6 +34,10 @@ type Subscription {
         "reportLatency"
       ]
     )
+  removedPlayer: Player
+    @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    @aws_api_key
+    @aws_subscribe(mutations: ["removePlayer"])
   updatedGameStatus: GameStatus
     @aws_cognito_user_pools(cognito_groups: ["Admins"])
     @aws_api_key

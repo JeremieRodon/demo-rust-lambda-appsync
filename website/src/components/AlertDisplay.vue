@@ -11,10 +11,12 @@ import { alerts } from '@/modules/utils';
       v-for="(alert, idx) in alerts"
       :key="idx"
       role="alert"
-      class="alert p-1 rounded-xl mb-1 gap-1 md:gap-4"
+      class="alert p-1 rounded-xl mb-1 gap-1 md:gap-4 grid-cols-12"
       :class="alert.alert_class"
     >
-      <div class="flex text-sm col-start-1 col-span-12 sm:col-auto">
+      <div
+        class="flex flex-row text-sm col-start-2 col-span-10 sm:col-span-2 w-full justify-center"
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           class="h-5 w-5 shrink-0 fill-current"
@@ -24,11 +26,17 @@ import { alerts } from '@/modules/utils';
             d="M13,13H11V7H13M13,17H11V15H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"
           />
         </svg>
-        <b>{{ alert.title }}</b>
+        <div>
+          <b>{{ alert.title }}</b>
+        </div>
       </div>
-      <span class="text-xs col-start-1 col-span-11 sm:col-auto">{{ alert.message }}</span>
+      <div
+        class="flex flex-row text-xs col-start-2 col-span-10 sm:col-start-auto sm:col-span-8 w-full justify-center"
+      >
+        {{ alert.message }}
+      </div>
       <button
-        class="btn btn-circle btn-outline btn-xs text-current col-start-12 col-span-1 sm:col-auto"
+        class="btn btn-circle btn-outline btn-xs text-current col-start-12 col-span-1 row-span-full"
         @click="alert.close()"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24">

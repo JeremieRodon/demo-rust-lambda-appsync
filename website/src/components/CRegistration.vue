@@ -1,0 +1,94 @@
+<script setup>
+import CModal from '@/components/CModal.vue';
+import SimpleInput from '@/components/SimpleInput.vue';
+import { alert_error, alert_success } from '@/modules/utils';
+import { computed, inject, ref } from 'vue';
+
+const registered_player_id = inject('registered_player_id');
+const signed_user = inject('signed_user');
+const is_admin = computed(() => {
+  return signed_user.value != null && signed_user.value.is_admin;
+});
+const need_registration = computed(() => {
+  return registered_player_id.value == null && !is_admin.value;
+});
+
+const player_name = ref(null);
+const player_name_error = ref(null);
+const in_operation = ref(false);
+
+const client = inject('appsync_client');
+
+async function handle_register() {
+  in_operation.value = true;
+  const name = player_name.value;
+  const variables = {
+    name,
+  };
+  console.log(variables);
+  try {
+    const player_id = (
+      await client.graphql({
+        query: `
+        mutation registerNewPlayer($name: String!) {
+            registerNewPlayer(name: $name) {
+              id
+            }
+          }
+      `,
+        variables,
+      })
+    ).data.registerNewPlayer.id;
+
+    registered_player_id.value = player_id;
+
+    alert_success(`Welcome ${name}! 🎉`);
+  } catch (e) {
+    console.error(e);
+    alert_error('Could not register you 😭');
+  } finally {
+    in_operation.value = false;
+  }
+}
+</script>
+
+<template>
+  <c-modal v-model="need_registration">
+    <div class="card bg-base-100 w-fit mx-auto">
+      <div class="card-title text-4xl font-bold justify-center">Registration</div>
+      <div class="card-body w-fit">
+        <p class="text-base">You must choose a pseudonym before playing.</p>
+        <simple-input
+          v-model="player_name"
+          v-model:error="player_name_error"
+          tabindex="1"
+          id="pseudonym"
+          placeholder="The GOAT 🐐"
+          autocomplete="off"
+          :rules="[
+            (pseudo) => (pseudo && pseudo.length >= 3) || 'Must be at least 3 chars',
+            (pseudo) => pseudo.length < 30 || 'Must be max 30 chars',
+          ]"
+          @keydown.enter="
+            if (!in_operation && !player_name_error) {
+              handle_register();
+            }
+          "
+        >
+          Player Name
+        </simple-input>
+        <div class="flex flex-col mt-2 gap-2">
+          <button
+            class="btn btn-primary"
+            :disabled="in_operation || player_name_error"
+            tabindex="2"
+            @click="handle_register()"
+          >
+            <span v-show="in_operation" class="loading loading-spinner loading-md"></span>
+            Register
+          </button>
+        </div>
+      </div>
+    </div>
+  </c-modal>
+</template>

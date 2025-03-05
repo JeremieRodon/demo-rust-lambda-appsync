@@ -5,7 +5,7 @@ export async function getUserInfos() {
   const {
     idToken: { payload },
   } = (await fetchAuthSession()).tokens ?? {};
-  const groups = payload['cognito:groups'];
+  const groups = payload['cognito:groups'] ?? [];
   const is_admin = groups.indexOf('Admins') >= 0;
   const user = {
     id: payload.sub,
@@ -40,14 +40,26 @@ export function alert(title, alert_class, message, timeout) {
   _alerts.set(id, error_wrapper);
 }
 export function alert_error(message, timeout = 5000) {
-  alert('Erreur', 'alert-error', message, timeout);
+  alert('Error', 'alert-error', message, timeout);
 }
 export function alert_success(message, timeout = 5000) {
-  alert('Succès', 'alert-success', message, timeout);
+  alert('Success', 'alert-success', message, timeout);
 }
 export function alert_warning(message, timeout = 5000) {
-  alert('Attention', 'alert-warning', message, timeout);
+  alert('Warning', 'alert-warning', message, timeout);
 }
 export function alert_info(message, timeout = 5000) {
   alert('Info', 'alert-info', message, timeout);
+}
+
+export function team_to_displayname(team) {
+  if (team == 'RUST') {
+    return 'Team Rust';
+  } else if (team == 'JS') {
+    return 'Team Javascript';
+  } else if (team == 'VTL') {
+    return 'Team Velocity';
+  } else {
+    return 'No Team';
+  }
 }

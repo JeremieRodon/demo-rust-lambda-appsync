@@ -1,0 +1,15 @@
+[package]
+name = "appsync-source"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+shared_types = { path = "../../libs/shared_types" }
+lambda_commons_utils = { path = "../../libs/lambda_commons_utils" }
+aws-sdk-dynamodb = { workspace = true }
+
+serde = { workspace = true }
+serde_dynamo = { workspace = true }
+
+thiserror = { workspace = true }

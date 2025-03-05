@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import { getCurrentUser, signIn } from 'aws-amplify/auth';
+import { getCurrentUser, signInWithRedirect } from 'aws-amplify/auth';
 
 import AdminView from '@/views/AdminView.vue';
 import MainLayout from '@/layouts/MainLayout.vue';
@@ -23,15 +23,15 @@ const routes = [
         name: 'leaderboard',
         component: LeaderBoard,
       },
+      {
+        path: '/admin',
+        name: 'admin',
+        component: AdminView,
+        meta: {
+          requiresAuth: true,
+        },
+      },
     ],
-  },
-  {
-    path: '/admin',
-    name: 'admin',
-    component: AdminView,
-    meta: {
-      requiresAuth: true,
-    },
   },
 ];
 
@@ -55,7 +55,7 @@ router.beforeResolve((to, from, next) => {
       })
       .catch(() => {
         window.sessionStorage.setItem('preauthpath', to.path);
-        signIn();
+        signInWithRedirect();
       });
   } else if (window.sessionStorage.getItem('preauthpath') != null) {
     getCurrentUser()
