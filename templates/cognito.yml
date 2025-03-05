@@ -8,9 +8,6 @@ Parameters:
     Type: String
     Description: The domain name of our website to deploy
 
-Conditions:
-  IsMaster: !Equals [!Ref Environment, "master"]
-
 Resources:
   #####################
   # Cognito User Pool #

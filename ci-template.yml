@@ -436,9 +436,11 @@ Resources:
                   - lambda:*
                   - iam:*Role*
                   - logs:*
+                  - s3:*Bucket*
+                  - s3:*Configuration
+                  - cloudfront:*
                   - dynamodb:*
                   - appsync:*
-                  - s3:*
                   - cognito-idp:*
                 Resource: "*"
       Path: /
