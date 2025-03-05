@@ -77,9 +77,8 @@ Resources:
       BucketName: !Ref ArtifactBucket
   BucketEmptierLambda:
     Type: AWS::Serverless::Function
-    DependsOn: BucketEmptierLambdaLogGroup
     Properties:
-      FunctionName: !Sub lambda-${ProjectName}-s3-bucket-emptier
+      FunctionName: !Sub ${ProjectName}-s3-bucket-emptier
       Description: Called by a CF Custom Resource to empty an S3 bucket before destroying it
       Handler: index.lambda_handler
       Runtime: python3.13
@@ -100,26 +99,58 @@ Resources:
           except Exception as e:
             cfnresponse.send(event, context, cfnresponse.FAILED, {'Data': str(e)}, physical_id)
       Timeout: 900
-      Policies:
-        - Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Action:
-                - s3:DeleteObject
-                - s3:DeleteObjectVersion
-                - s3:ListBucket
-                - s3:ListBucketVersions
-              Resource:
-                - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac
-                - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac/*
-                - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website
-                - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website/*
+      Role: !GetAtt BucketEmptierLambdaRole.Arn
   BucketEmptierLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/lambda/lambda-${ProjectName}-s3-bucket-emptier
+      LogGroupName: !Sub /aws/lambda/${BucketEmptierLambda}
       RetentionInDays: 90
-
+  BucketEmptierLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-s3-bucket-emptier
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  BucketEmptierLambdaRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref BucketEmptierLambdaRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt BucketEmptierLambdaLogGroup.Arn
+  BucketEmptierLambdaWorkPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref BucketEmptierLambdaRole
+      PolicyName: work-rights
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+              - s3:ListBucket
+              - s3:ListBucketVersions
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac/*
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website/*
   ###############
   # Build Infra #
   ###############

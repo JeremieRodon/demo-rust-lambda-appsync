@@ -46,7 +46,7 @@ Resources:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
       UserPoolId: !Ref UserPool
-      Domain: !Join ["", !Split ["_", !Ref UserPool]]
+      Domain: !Ref ProjectName
       ManagedLoginVersion: 2
 
   UserPoolClient:
@@ -114,4 +114,4 @@ Outputs:
     Value: !Ref UserPoolClient
   CognitoDomainName:
     Description: Domain of Cognito
-    Value: !Sub ${DefaultUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
+    Value: !Sub ${ProjectName}.auth.${AWS::Region}.amazoncognito.com

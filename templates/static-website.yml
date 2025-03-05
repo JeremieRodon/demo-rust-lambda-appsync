@@ -63,7 +63,7 @@ Resources:
   CleanupS3Lambda:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub lambda-${ProjectName}-cleanup-s3
+      FunctionName: !Sub ${ProjectName}-cleanup-s3
       Handler: index.lambda_handler
       Runtime: python3.13
       MemorySize: 128
