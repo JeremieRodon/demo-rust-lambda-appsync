@@ -16,29 +16,29 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
-  CognitoStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      Parameters:
-        ProjectName: !Ref ProjectName
-        WebsiteDomainName: !GetAtt StaticWebsiteStack.Outputs.WebsiteDomainName
-      TemplateURL: ./templates/cognito.yml
-      TimeoutInMinutes: 10
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
-  GraphQLApiStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      Parameters:
-        ProjectName: !Ref ProjectName
-        CognitoUserPoolId: !GetAtt CognitoStack.Outputs.CognitoUserPoolId
-        CognitoUserPoolClientId: !GetAtt CognitoStack.Outputs.CognitoUserPoolClientId
-      TemplateURL: ./templates/graphqlapi.yml
-      TimeoutInMinutes: 10
-      Tags:
-        - Key: Project
-          Value: !Ref ProjectName
+  # CognitoStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     Parameters:
+  #       ProjectName: !Ref ProjectName
+  #       WebsiteDomainName: !GetAtt StaticWebsiteStack.Outputs.WebsiteDomainName
+  #     TemplateURL: ./templates/cognito.yml
+  #     TimeoutInMinutes: 10
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref ProjectName
+  # GraphQLApiStack:
+  #   Type: AWS::CloudFormation::Stack
+  #   Properties:
+  #     Parameters:
+  #       ProjectName: !Ref ProjectName
+  #       CognitoUserPoolId: !GetAtt CognitoStack.Outputs.CognitoUserPoolId
+  #       CognitoUserPoolClientId: !GetAtt CognitoStack.Outputs.CognitoUserPoolClientId
+  #     TemplateURL: ./templates/graphqlapi.yml
+  #     TimeoutInMinutes: 10
+  #     Tags:
+  #       - Key: Project
+  #         Value: !Ref ProjectName
 
 Outputs:
   StaticWebBucket:
@@ -47,18 +47,18 @@ Outputs:
   WebsiteUrl:
     Description: URL of the website
     Value: !Sub https://${StaticWebsiteStack.Outputs.WebsiteDomainName}/
-  CognitoUserPoolId:
-    Description: The Cognito UserPool ID
-    Value: !GetAtt CognitoStack.Outputs.CognitoUserPoolId
-  CognitoUserPoolClientId:
-    Description: The Cognito UserPool client ID
-    Value: !GetAtt CognitoStack.Outputs.CognitoUserPoolClientId
-  CognitoDomainName:
-    Description: Domain of Cognito
-    Value: !GetAtt CognitoStack.Outputs.CognitoDomainName
-  GraphQLApiUrl:
-    Description: GraphQL API URL
-    Value: !GetAtt GraphQLApiStack.Outputs.ApiUrl
-  GraphQLApiKey:
-    Description: The Public API key of the API
-    Value: !GetAtt GraphQLApiStack.Outputs.ApiKey
+  # CognitoUserPoolId:
+  #   Description: The Cognito UserPool ID
+  #   Value: !GetAtt CognitoStack.Outputs.CognitoUserPoolId
+  # CognitoUserPoolClientId:
+  #   Description: The Cognito UserPool client ID
+  #   Value: !GetAtt CognitoStack.Outputs.CognitoUserPoolClientId
+  # CognitoDomainName:
+  #   Description: Domain of Cognito
+  #   Value: !GetAtt CognitoStack.Outputs.CognitoDomainName
+  # GraphQLApiUrl:
+  #   Description: GraphQL API URL
+  #   Value: !GetAtt GraphQLApiStack.Outputs.ApiUrl
+  # GraphQLApiKey:
+  #   Description: The Public API key of the API
+  #   Value: !GetAtt GraphQLApiStack.Outputs.ApiKey
