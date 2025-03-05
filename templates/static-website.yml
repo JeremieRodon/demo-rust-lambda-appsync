@@ -83,23 +83,55 @@ Resources:
       Description: Called to cleanup old deployment and remove sensible metadata.
       CodeUri: ../python/lambdas/cleanup-s3
       Timeout: 300
-      Policies:
-        - Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Action:
-                - s3:PutObjectTagging
-                - s3:GetObject
-                - s3:ListBucket
-              Resource:
-                - !Sub arn:${AWS::Partition}:s3:::${StaticWebBucket}
-                - !Sub arn:${AWS::Partition}:s3:::${StaticWebBucket}/*
+      Role: !GetAtt CleanupS3LambdaRole.Arn
   CleanupS3LambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${CleanupS3Lambda}
       RetentionInDays: 90
-
+  CleanupS3LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-cleanup-s3
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  CleanupS3LambdaRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref CleanupS3LambdaRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt CleanupS3LambdaLogGroup.Arn
+  CleanupS3LambdaWorkPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref CleanupS3LambdaRole
+      PolicyName: work-rights
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObjectTagging
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${StaticWebBucket}
+              - !Sub arn:${AWS::Partition}:s3:::${StaticWebBucket}/*
   ###########################
   # Cloudfront Distribution #
   ###########################

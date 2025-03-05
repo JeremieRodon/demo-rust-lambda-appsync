@@ -77,6 +77,7 @@ Resources:
       BucketName: !Ref ArtifactBucket
   BucketEmptierLambda:
     Type: AWS::Serverless::Function
+    DependsOn: BucketEmptierLambdaLogGroup
     Properties:
       FunctionName: !Sub lambda-${ProjectName}-s3-bucket-emptier
       Description: Called by a CF Custom Resource to empty an S3 bucket before destroying it
@@ -116,7 +117,7 @@ Resources:
   BucketEmptierLambdaLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/lambda/${BucketEmptierLambda}
+      LogGroupName: !Sub /aws/lambda/lambda-${ProjectName}-s3-bucket-emptier
       RetentionInDays: 90
 
   ###############
