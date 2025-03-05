@@ -429,7 +429,7 @@ Resources:
                   - cloudformation:UpdateStack
                   - cloudformation:RollbackStack
                   - cloudformation:DeleteStack
-                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*${ProjectName}*
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/root-stack-${ProjectName}*
               - Effect: Allow
                 Action:
                   - lambda:*

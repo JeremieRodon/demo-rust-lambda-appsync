@@ -12,7 +12,6 @@ Resources:
   ############################
   StaticWebBucket:
     Type: AWS::S3::Bucket
-    DependsOn: CleanupS3Lambda
     Properties:
       BucketName: !Sub ${ProjectName}-${AWS::AccountId}-${AWS::Region}-website
       OwnershipControls:
