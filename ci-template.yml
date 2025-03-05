@@ -72,6 +72,11 @@ Resources:
                 StorageClass: INTELLIGENT_TIERING
   ArtifactBucketEmptier:
     Type: Custom::BucketEmptier
+    DependsOn:
+      - BucketEmptierLambdaRole
+      - BucketEmptierLambdaRoleBasicPolicy
+      - BucketEmptierLambdaWorkPolicy
+      - BucketEmptierLambdaLogGroup
     Properties:
       ServiceToken: !GetAtt BucketEmptierLambda.Arn
       BucketName: !Ref ArtifactBucket
