@@ -1,0 +1,161 @@
+use shared_types::common::Uuid;
+
+use crate::{
+    appsync_utils::AppSyncError,
+    dynamodb_utils::{
+        dynamodb_delete_player, dynamodb_get_player, dynamodb_player_click,
+        dynamodb_put_new_player, dynamodb_query_game_state, dynamodb_query_teams_player_count,
+        dynamodb_update_player_latency_stats, dynamodb_update_player_name,
+    },
+    GameState, GameStatus, LatencyReport, Player,
+};
+
+impl crate::Operation {
+    pub async fn query_game_state() -> Result<GameState, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::query_game_state().await;
+        }
+        Ok(dynamodb_query_game_state().await?)
+    }
+}
+
+macro_rules! game_status_mut {
+    ($mut_name:ident, $status:path ) => {
+        impl crate::Operation {
+            pub async fn $mut_name() -> Result<GameStatus, AppSyncError> {
+                // This is just a marker to ensure an error is thrown if the user did not chose
+                // the correct signature for the function. Should be optimized away by the compiler.
+                if false {
+                    return <crate::Operation as crate::DefautOperations>::$mut_name().await;
+                }
+                crate::dynamodb_utils::dynamodb_set_game_status($status).await?;
+                Ok($status)
+            }
+        }
+    };
+}
+
+game_status_mut!(mutation_start_game, GameStatus::Started);
+game_status_mut!(mutation_stop_game, GameStatus::Stopped);
+game_status_mut!(mutation_reset_game, GameStatus::Reset);
+
+impl crate::Operation {
+    pub async fn mutation_register_new_player(name: String) -> Result<Player, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::mutation_register_new_player(
+                name,
+            )
+            .await;
+        }
+        let mut teams_player_count = dynamodb_query_teams_player_count().await?;
+        teams_player_count.sort_by_key(|o| o.1);
+        let id = Uuid::new_v4();
+        let team = teams_player_count[0].0;
+        let new_player = Player {
+            id,
+            name,
+            team,
+            clicks: None,
+            avg_latency: None,
+            avg_latency_clicks: None,
+        };
+        dynamodb_put_new_player(&new_player).await?;
+        Ok(new_player)
+    }
+}
+
+impl crate::Operation {
+    pub async fn mutation_update_player_name(
+        player_id: Uuid,
+        new_name: String,
+    ) -> Result<Player, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::mutation_update_player_name(
+                player_id, new_name,
+            )
+            .await;
+        }
+        Ok(dynamodb_update_player_name(player_id, new_name).await?)
+    }
+}
+
+impl crate::Operation {
+    pub async fn mutation_remove_player(player_id: Uuid) -> Result<Player, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::mutation_remove_player(
+                player_id,
+            )
+            .await;
+        }
+        Ok(dynamodb_delete_player(player_id).await?)
+    }
+}
+
+impl crate::Operation {
+    pub async fn mutation_click_rust(player_id: Uuid) -> Result<Player, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::mutation_click_rust(player_id)
+                .await;
+        }
+        Ok(dynamodb_player_click(player_id).await?)
+    }
+}
+
+impl crate::Operation {
+    pub async fn mutation_report_latency_rust(
+        player_id: Uuid,
+        report: LatencyReport,
+    ) -> Result<Player, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::mutation_report_latency_rust(
+                player_id, report,
+            )
+            .await;
+        }
+        // Retrieve the current player
+        let mut player = dynamodb_get_player(player_id).await?;
+        let LatencyReport {
+            clicks,
+            avg_latency,
+        } = report;
+        let old_avg_latency = player.avg_latency;
+        let old_avg_latency_clicks = player.avg_latency_clicks;
+        let old_total_latency = match (old_avg_latency, old_avg_latency_clicks) {
+            (Some(old_avg_latency), Some(old_avg_latency_clicks)) => {
+                old_avg_latency * (old_avg_latency_clicks as f64)
+            }
+            (None, None) => 0f64,
+            _ => unreachable!(
+                "Functionnal error, old_avg_latency and old_avg_latency_clicks \
+        can only be both None or both Some"
+            ),
+        };
+        let new_total_latency = old_total_latency + avg_latency * (clicks as f64);
+        let new_avg_latency_clicks = old_avg_latency_clicks.unwrap_or_default() + clicks;
+        let new_avg_latency = new_total_latency / (new_avg_latency_clicks as f64);
+        dynamodb_update_player_latency_stats(
+            player_id,
+            old_avg_latency,
+            old_avg_latency_clicks,
+            new_avg_latency,
+            new_avg_latency_clicks,
+        )
+        .await?;
+
+        player.avg_latency = Some(new_avg_latency);
+        player.avg_latency_clicks = Some(new_avg_latency_clicks);
+        Ok(player)
+    }
+}

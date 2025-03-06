@@ -1,50 +1,19 @@
-use std::ops::BitOr;
+use std::{collections::HashMap, ops::BitOr};
 
 use lambda_commons_utils::serde_json::Value;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum QueryField {
-    GameState,
-}
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum MutationField {
-    StartGame,
-    StopGame,
-    ResetGame,
-    RegisterNewPlayer,
-    UpdatePlayerName,
-    RemovePlayer,
-    Click,
-    ReportLatency,
-}
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum SubscriptionField {
-    UpdatedPlayer,
-    RemovedPlayer,
-    UpdatedGameStatus,
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(tag = "parentTypeName", content = "fieldName")]
-pub enum Operation {
-    Query(QueryField),
-    Mutation(MutationField),
-    Subscription(SubscriptionField),
-}
-
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum AppSyncAuthStrategy {
     Allow,
     Deny,
 }
-#[derive(Debug, Deserialize, Serialize)]
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct AppSyncIdentity {
     pub sub: String,
     pub username: String,
@@ -57,12 +26,25 @@ pub struct AppSyncIdentity {
     pub claims: Value,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct AppSyncEvent {
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct AppSyncEventInfo<O> {
+    #[serde(flatten)]
+    pub operation: O,
+    #[serde(rename = "selectionSetGraphQL")]
+    pub selection_set_graphql: String,
+    #[serde(rename = "selectionSetList")]
+    pub selection_set_list: Vec<String>,
+    pub variables: HashMap<String, Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct AppSyncEvent<O> {
     pub identity: Option<AppSyncIdentity>,
     pub request: Value,
     pub source: Value,
-    pub info: Operation,
+    pub info: AppSyncEventInfo<O>,
     #[serde(rename = "arguments")]
     pub args: Value,
     // Should never be usefull in a Direct Lambda Invocation context

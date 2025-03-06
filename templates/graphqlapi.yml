@@ -41,13 +41,9 @@ Resources:
       AttributeDefinitions:
         - AttributeName: PK
           AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: True
 
@@ -169,45 +165,45 @@ Resources:
                   - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
                   - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
       Path: /
-  # AppsyncSourceFunction:
-  #   Type: AWS::Serverless::Function
-  #   Properties:
-  #     FunctionName: !Sub ${ProjectName}-appsync-source
-  #     CodeUri: ../rust/lambdas/appsync-source
-  #     Role: !GetAtt BackendTableAccessRole.Arn
-  # AppsyncSourceFunctionLogGroup:
-  #   Type: AWS::Logs::LogGroup
-  #   Properties:
-  #     LogGroupName: !Sub /aws/lambda/${AppsyncSourceFunction}
-  #     RetentionInDays: 90
-  # LambdaDatasource:
-  #   Type: AWS::AppSync::DataSource
-  #   Properties:
-  #     ApiId: !GetAtt GraphQLApi.ApiId
-  #     Type: AWS_LAMBDA
-  #     Name: lambda_source
-  #     LambdaConfig:
-  #       LambdaFunctionArn: !GetAtt AppsyncSourceFunction.Arn
-  #     ServiceRoleArn: !GetAtt LambdaDatasourceRole.Arn
-  # LambdaDatasourceRole:
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     RoleName: !Sub gql-${ProjectName}-datasource-lambda
-  #     AssumeRolePolicyDocument:
-  #       Version: 2012-10-17
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service: appsync.amazonaws.com
-  #           Action: sts:AssumeRole
-  #     Policies:
-  #       - PolicyName: invoke-lambda
-  #         PolicyDocument:
-  #           Version: 2012-10-17
-  #           Statement:
-  #             - Effect: Allow
-  #               Action: lambda:InvokeFunction
-  #               Resource: !GetAtt AppsyncSourceFunction.Arn
+  AppsyncSourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-appsync-source
+      CodeUri: ../rust/lambdas/appsync-source
+      Role: !GetAtt BackendTableAccessRole.Arn
+  AppsyncSourceFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AppsyncSourceFunction}
+      RetentionInDays: 90
+  LambdaDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AWS_LAMBDA
+      Name: lambda_source
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt AppsyncSourceFunction.Arn
+      ServiceRoleArn: !GetAtt LambdaDatasourceRole.Arn
+  LambdaDatasourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub gql-${ProjectName}-datasource-lambda
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-lambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt AppsyncSourceFunction.Arn
       Path: /
   #############
   # Resolvers #

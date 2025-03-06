@@ -18,8 +18,13 @@ type Mutation {
   updatePlayerName(new_name: String!): Player! @aws_api_key
   removePlayer(player_id: ID!): Player!
     @aws_cognito_user_pools(cognito_groups: ["Admins"])
-  click(player_id: ID!): Player! @aws_api_key
-  reportLatency(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
+  clickRust(player_id: ID!): Player! @aws_api_key
+  clickJs(player_id: ID!): Player! @aws_api_key
+  clickVtl(player_id: ID!): Player! @aws_api_key
+  reportLatencyRust(player_id: ID!, report: LatencyReport!): Player!
+    @aws_api_key
+  reportLatencyJs(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
+  reportLatencyVtl(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
 }
 
 type Subscription {

@@ -3,7 +3,7 @@ mod new_uuid {
 
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
     #[serde(try_from = "String", into = "String")]
     pub struct Uuid(uuid::Uuid);
     impl Uuid {

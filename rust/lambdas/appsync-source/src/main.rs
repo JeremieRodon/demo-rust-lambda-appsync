@@ -1,72 +1,292 @@
 mod appsync_utils;
 mod dynamodb_utils;
+mod game;
+mod operations;
 
-use appsync_utils::{
-    AppSyncError, AppSyncEvent, AppSyncIdentity, AppSyncResponse, MutationField, Operation,
-    QueryField,
-};
+use appsync_utils::{AppSyncError, AppSyncEvent, AppSyncEventInfo, AppSyncResponse};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use lambda_commons_utils::prelude::*;
+use shared_types::common::Uuid;
 
-fn invalid_args(arg_name: &str, e: impl core::error::Error) -> AppSyncError {
-    AppSyncError::new(
-        "InvalidArgs",
-        format!("Argument \"{arg_name}\" is not the expected format ({e})"),
-    )
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum GameStatus {
+    Started,
+    Stopped,
+    Reset,
 }
 
-macro_rules! op_invoke {
-    ($args:ident, $f:ident($($arg:literal,)*)) => {
-        $f(
-            $(
-                serde_json::from_value($args.get_mut($arg)
-                        .unwrap_or(&mut serde_json::Value::Null)
-                        .take(),
-                ).map_err(|e| invalid_args($arg, e))?,
-            )*
-        ).await
-        .map(|r| serde_json::to_value(r).expect("cannot fail"))
-    };
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum Team {
+    Rust,
+    Js,
+    Vtl,
 }
 
-async fn handler(event: AppSyncEvent) -> Result<serde_json::Value, AppSyncError> {
-    log::info!("event={event:?}");
-    let AppSyncEvent {
-        identity,
-        request: _,
-        source: _,
-        info,
-        mut args,
-    } = event;
-    log::info!("operation={info:?}");
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Player {
+    pub id: Uuid,
+    pub name: String,
+    pub team: Team,
+    pub clicks: Option<i64>,
+    pub avg_latency: Option<f64>,
+    pub avg_latency_clicks: Option<i64>,
+}
 
-    match info {
-        Operation::Query(query_field) => match query_field {
-            QueryField::GameState => todo!(),
-            // QueryField::GuestGroups => op_invoke!(args, guest_groups()),
-            // QueryField::GuestGroup => op_invoke!(args, guest_group("id",)),
-            // QueryField::TentativeGuestRequests => op_invoke!(args, tentative_guest_requests()),
-            // QueryField::Strings => op_invoke!(args, get_strings()),
-        },
-        Operation::Mutation(mutation_field) => match mutation_field {
-            MutationField::StartGame => todo!(),
-            MutationField::StopGame => todo!(),
-            MutationField::ResetGame => todo!(),
-            MutationField::RegisterNewPlayer => todo!(),
-            MutationField::UpdatePlayerName => todo!(),
-            MutationField::RemovePlayer => todo!(),
-            MutationField::Click => todo!(),
-            MutationField::ReportLatency => todo!(),
-            // MutationField::CreateGuestGroup => {
-            //     op_invoke!(args, create_guest_group("name", "guests",))
-            // }
-        },
-        Operation::Subscription(_) => Ok(serde_json::Value::Null),
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+pub struct LatencyReport {
+    clicks: i64,
+    avg_latency: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GameState {
+    status: GameStatus,
+    players: Vec<Player>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum QueryField {
+    GameState,
+}
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MutationField {
+    StartGame,
+    StopGame,
+    ResetGame,
+    RegisterNewPlayer,
+    UpdatePlayerName,
+    RemovePlayer,
+    ClickRust,
+    ClickJs,
+    ClickVtl,
+    ReportLatencyRust,
+    ReportLatencyJs,
+    ReportLatencyVtl,
+}
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SubscriptionField {
+    UpdatedPlayer,
+    RemovedPlayer,
+    UpdatedGameStatus,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(tag = "parentTypeName", content = "fieldName")]
+pub enum Operation {
+    Query(QueryField),
+    Mutation(MutationField),
+    Subscription(SubscriptionField),
+}
+
+#[allow(dead_code)]
+trait DefautOperations {
+    async fn query_game_state() -> Result<GameState, AppSyncError> {
+        unimplemented!("Query `gameState` is unimplemented")
+    }
+    async fn mutation_start_game() -> Result<GameStatus, AppSyncError> {
+        unimplemented!("Mutation `startGame` is unimplemented")
+    }
+    async fn mutation_stop_game() -> Result<GameStatus, AppSyncError> {
+        unimplemented!("Mutation `stopGame` is unimplemented")
+    }
+    async fn mutation_reset_game() -> Result<GameStatus, AppSyncError> {
+        unimplemented!("Mutation `resetGame` is unimplemented")
+    }
+    async fn mutation_register_new_player(_name: String) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `registerNewPlayer` is unimplemented")
+    }
+    async fn mutation_update_player_name(
+        _player_id: Uuid,
+        _new_name: String,
+    ) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `updatePlayerName` is unimplemented")
+    }
+    async fn mutation_remove_player(_player_id: Uuid) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `removePlayer` is unimplemented")
+    }
+    async fn mutation_click_rust(_player_id: Uuid) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `clickRust` is unimplemented")
+    }
+    async fn mutation_click_js(_player_id: Uuid) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `clickJs` is unimplemented")
+    }
+    async fn mutation_click_vtl(_player_id: Uuid) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `clickVtl` is unimplemented")
+    }
+    async fn mutation_report_latency_rust(
+        _player_id: Uuid,
+        _report: LatencyReport,
+    ) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `reportLatencyRust` is unimplemented")
+    }
+    async fn mutation_report_latency_js(
+        _player_id: Uuid,
+        _report: LatencyReport,
+    ) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `reportLatencyJs` is unimplemented")
+    }
+    async fn mutation_report_latency_vtl(
+        _player_id: Uuid,
+        _report: LatencyReport,
+    ) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `reportLatencyVtl` is unimplemented")
+    }
+    async fn subscription_updated_player() -> Result<(), AppSyncError> {
+        Ok(())
+    }
+    async fn subscription_removed_player() -> Result<(), AppSyncError> {
+        Ok(())
+    }
+    async fn subscription_updated_game_status() -> Result<(), AppSyncError> {
+        Ok(())
+    }
+}
+impl DefautOperations for Operation {}
+
+impl Operation {
+    pub async fn execute(self, args: serde_json::Value) -> AppSyncResponse {
+        match self._execute(args).await {
+            Ok(v) => AppSyncResponse {
+                data: Some(v),
+                error: None,
+            },
+            Err(e) => {
+                log::error!("{e}");
+                AppSyncResponse {
+                    data: None,
+                    error: Some(e),
+                }
+            }
+        }
+    }
+
+    async fn _execute(
+        self,
+        mut args: serde_json::Value,
+    ) -> Result<serde_json::Value, AppSyncError> {
+        match self {
+            Operation::Query(query_field) => match query_field {
+                QueryField::GameState => Operation::query_game_state().await.map(res_to_json),
+            },
+            Operation::Mutation(mutation_field) => match mutation_field {
+                MutationField::StartGame => Operation::mutation_start_game().await.map(res_to_json),
+                MutationField::StopGame => Operation::mutation_stop_game().await.map(res_to_json),
+                MutationField::ResetGame => Operation::mutation_reset_game().await.map(res_to_json),
+                MutationField::RegisterNewPlayer => {
+                    Operation::mutation_register_new_player(arg_from_json(&mut args, "name")?)
+                        .await
+                        .map(res_to_json)
+                }
+                MutationField::UpdatePlayerName => Operation::mutation_update_player_name(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "new_name")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::RemovePlayer => {
+                    Operation::mutation_remove_player(arg_from_json(&mut args, "player_id")?)
+                        .await
+                        .map(res_to_json)
+                }
+                MutationField::ClickRust => {
+                    Operation::mutation_click_rust(arg_from_json(&mut args, "player_id")?)
+                        .await
+                        .map(res_to_json)
+                }
+                MutationField::ClickJs => {
+                    Operation::mutation_click_js(arg_from_json(&mut args, "player_id")?)
+                        .await
+                        .map(res_to_json)
+                }
+                MutationField::ClickVtl => {
+                    Operation::mutation_click_vtl(arg_from_json(&mut args, "player_id")?)
+                        .await
+                        .map(res_to_json)
+                }
+                MutationField::ReportLatencyRust => Operation::mutation_report_latency_rust(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "report")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::ReportLatencyJs => Operation::mutation_report_latency_js(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "report")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::ReportLatencyVtl => Operation::mutation_report_latency_vtl(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "report")?,
+                )
+                .await
+                .map(res_to_json),
+            },
+            Operation::Subscription(subscription_field) => match subscription_field {
+                SubscriptionField::UpdatedPlayer => Operation::subscription_updated_player()
+                    .await
+                    .map(res_to_json),
+                SubscriptionField::RemovedPlayer => Operation::subscription_removed_player()
+                    .await
+                    .map(res_to_json),
+                SubscriptionField::UpdatedGameStatus => {
+                    Operation::subscription_updated_game_status()
+                        .await
+                        .map(res_to_json)
+                }
+            },
+        }
     }
 }
 
+fn arg_from_json<T: DeserializeOwned>(
+    args: &mut serde_json::Value,
+    arg_name: &'static str,
+) -> Result<T, AppSyncError> {
+    serde_json::from_value(
+        args.get_mut(arg_name)
+            .unwrap_or(&mut serde_json::Value::Null)
+            .take(),
+    )
+    .map_err(|e| {
+        AppSyncError::new(
+            "InvalidArgs",
+            format!("Argument \"{arg_name}\" is not the expected format ({e})"),
+        )
+    })
+}
+
+fn res_to_json<T: Serialize>(res: T) -> serde_json::Value {
+    serde_json::to_value(res).expect("AppSync schema objects must be JSON compatible")
+}
+
+async fn handler(event: AppSyncEvent<Operation>) -> AppSyncResponse {
+    log::info!("event={event:?}");
+    let AppSyncEvent {
+        identity: _,
+        request: _,
+        source: _,
+        info:
+            AppSyncEventInfo {
+                operation,
+                selection_set_graphql: _,
+                selection_set_list: _,
+                variables: _,
+            },
+        args,
+    } = event;
+    log::info!("operation={operation:?}");
+    operation.execute(args).await
+}
+
 async fn batch_handler(
-    events: Vec<AppSyncEvent>,
+    events: Vec<AppSyncEvent<Operation>>,
 ) -> Result<Vec<AppSyncResponse>, std::convert::Infallible> {
     let handles = events
         .into_iter()
@@ -75,22 +295,9 @@ async fn batch_handler(
 
     let mut results = vec![];
     for h in handles {
-        match h.await.unwrap() {
-            Ok(v) => results.push(AppSyncResponse {
-                data: Some(v),
-                error: None,
-            }),
-            Err(e) => {
-                log::error!("{e}");
-                results.push(AppSyncResponse {
-                    data: None,
-                    error: Some(e),
-                })
-            }
-        }
+        results.push(h.await.unwrap())
     }
-
     Ok(results)
 }
 
-lambda_main!(async batch_handler(Vec<AppSyncEvent>)->Vec<AppSyncResponse>, dynamodb = aws_sdk_dynamodb::Client);
+lambda_main!(async batch_handler(Vec<AppSyncEvent<Operation>>)->Vec<AppSyncResponse>, dynamodb = aws_sdk_dynamodb::Client);
