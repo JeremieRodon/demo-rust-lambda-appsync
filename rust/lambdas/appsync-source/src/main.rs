@@ -30,8 +30,11 @@ pub struct Player {
     pub id: Uuid,
     pub name: String,
     pub team: Team,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub clicks: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avg_latency: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avg_latency_clicks: Option<i64>,
 }
 

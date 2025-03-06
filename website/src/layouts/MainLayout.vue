@@ -88,7 +88,7 @@ function update_player(player) {
   } else {
     // If the player was not present, it is the first time we saw them
     // So add them to the team list
-    team.players.add(player.id);
+    team.players.push(player.id);
   }
 
   // Then count them in
