@@ -290,22 +290,19 @@ pub async fn dynamodb_player_click(player_id: Uuid) -> Result<Player, aws_sdk_dy
 pub async fn dynamodb_query_teams_player_count(
 ) -> Result<Vec<(Team, usize)>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_query_teams_player_count");
-    let client = dynamodb();
-    let table_name = table_name();
 
-    let scan_res = client
+    let scan_req_builder = dynamodb()
         .scan()
-        .table_name(&table_name)
-        .projection_expression("PK,_TYPE,team")
-        .send()
-        .await?;
+        .table_name(table_name())
+        .projection_expression("PK,#type,team")
+        .expression_attribute_names("#type", "_TYPE");
+
+    let scan_res = scan_req_builder.clone().send().await?;
     let mut items = scan_res.items.unwrap_or_default();
     let mut lek = scan_res.last_evaluated_key;
     while lek.is_some() {
-        let scan_res = client
-            .scan()
-            .table_name(&table_name)
-            .projection_expression("PK,_TYPE,team")
+        let scan_res = scan_req_builder
+            .clone()
             .set_exclusive_start_key(lek)
             .send()
             .await?;
@@ -344,16 +341,14 @@ pub async fn dynamodb_query_teams_player_count(
 
 pub async fn dynamodb_query_game_state() -> Result<GameState, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_query_game_state");
-    let client = dynamodb();
-    let table_name = table_name();
 
-    let scan_res = client.scan().table_name(&table_name).send().await?;
+    let scan_req_builder = dynamodb().scan().table_name(table_name());
+    let scan_res = scan_req_builder.clone().send().await?;
     let mut items = scan_res.items.unwrap_or_default();
     let mut lek = scan_res.last_evaluated_key;
     while lek.is_some() {
-        let scan_res = client
-            .scan()
-            .table_name(&table_name)
+        let scan_res = scan_req_builder
+            .clone()
             .set_exclusive_start_key(lek)
             .send()
             .await?;
