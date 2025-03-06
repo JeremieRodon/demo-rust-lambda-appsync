@@ -1,5 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
-Transform: AWS::LanguageExtensions,AWS::Serverless-2016-10-31
+Transform:
+  - AWS::LanguageExtensions
+  - AWS::Serverless-2016-10-31
 Description: The backend REST API for the website
 
 Parameters:
@@ -55,12 +57,12 @@ Resources:
   #############################
   # AppSync GraphQL Resolvers #
   #############################
-  Fn::ForEach::RustOps:
+  "Fn::ForEach::RustOps":
     - OpType
     - [Query, Mutation, Subscription]
-    - Fn::ForEach::Op:
+    - "Fn::ForEach::Op":
         - Op
-        - !FindInMap [AppSyncResolvers, Rust, "${OpType}"]
+        - !FindInMap [AppSyncResolvers, Rust, !Ref OpType]
         - "Rust${OpType}${Op}Resolver":
             Type: AWS::AppSync::Resolver
             DependsOn: GraphQLApiSchema
@@ -68,8 +70,8 @@ Resources:
               ApiId: !GetAtt GraphQLApi.ApiId
               DataSourceName: !GetAtt LambdaDatasource.Name
               Kind: UNIT
-              TypeName: "${OpType}"
-              FieldName: "${Op}"
+              TypeName: !Ref OpType
+              FieldName: !Ref Op
               MaxBatchSize: 100
               MetricsConfig: ENABLED
   Fn::ForEach::JsOps:
@@ -77,7 +79,7 @@ Resources:
     - [Query, Mutation, Subscription]
     - Fn::ForEach::Op:
         - Op
-        - !FindInMap [AppSyncResolvers, Js, "${OpType}"]
+        - !FindInMap [AppSyncResolvers, Js, !Ref OpType]
         - "Js${OpType}${Op}Resolver":
             Type: AWS::AppSync::Resolver
             DependsOn: GraphQLApiSchema
@@ -85,8 +87,8 @@ Resources:
               ApiId: !GetAtt GraphQLApi.ApiId
               DataSourceName: !GetAtt LambdaDatasource.Name
               Kind: UNIT
-              TypeName: "${OpType}"
-              FieldName: "${Op}"
+              TypeName: !Ref OpType
+              FieldName: !Ref Op
               MaxBatchSize: 100
               MetricsConfig: ENABLED
   Fn::ForEach::VtlOps:
@@ -94,7 +96,7 @@ Resources:
     - [Query, Mutation, Subscription]
     - Fn::ForEach::Op:
         - Op
-        - !FindInMap [AppSyncResolvers, Vtl, "${OpType}"]
+        - !FindInMap [AppSyncResolvers, Vtl, !Ref OpType]
         - "Vtl${OpType}${Op}Resolver":
             Type: AWS::AppSync::Resolver
             DependsOn: GraphQLApiSchema
@@ -102,8 +104,8 @@ Resources:
               ApiId: !GetAtt GraphQLApi.ApiId
               DataSourceName: !GetAtt LambdaDatasource.Name
               Kind: UNIT
-              TypeName: "${OpType}"
-              FieldName: "${Op}"
+              TypeName: !Ref OpType
+              FieldName: !Ref Op
               MaxBatchSize: 100
               MetricsConfig: ENABLED
 
