@@ -26,7 +26,87 @@ Globals:
         USERPOOL_ID: !Ref CognitoUserPoolId
         RUST_LOG: debug,hyper=info,h2=info,tracing=info,aws_config=info,aws_smithy_runtime=info,aws_smithy_runtime_api=info,rustls=info
 
+Mappings:
+  AppSyncResolvers:
+    Rust:
+      Query: [gameState]
+      Mutation:
+        [
+          startGame,
+          stopGame,
+          resetGame,
+          registerNewPlayer,
+          updatePlayerName,
+          removePlayer,
+          clickRust,
+          reportLatencyRust,
+        ]
+      Subscription: [updatedPlayer, removedPlayer, updatedGameStatus]
+    Js:
+      Query: []
+      Mutation: [clickJs, reportLatencyJs]
+      Subscription: []
+    Vtl:
+      Query: []
+      Mutation: [clickVtl, reportLatencyVtl]
+      Subscription: []
+
 Resources:
+  #############################
+  # AppSync GraphQL Resolvers #
+  #############################
+  Fn::ForEach::RustOps:
+    - OpType
+    - [Query, Mutation, Subscription]
+    - Fn::ForEach::Op:
+        - Op
+        - !FindInMap [AppSyncResolvers, Rust, "${OpType}"]
+        - "Rust${OpType}${Op}Resolver":
+            Type: AWS::AppSync::Resolver
+            DependsOn: GraphQLApiSchema
+            Properties:
+              ApiId: !GetAtt GraphQLApi.ApiId
+              DataSourceName: !GetAtt LambdaDatasource.Name
+              Kind: UNIT
+              TypeName: "${OpType}"
+              FieldName: "${Op}"
+              MaxBatchSize: 100
+              MetricsConfig: ENABLED
+  Fn::ForEach::JsOps:
+    - OpType
+    - [Query, Mutation, Subscription]
+    - Fn::ForEach::Op:
+        - Op
+        - !FindInMap [AppSyncResolvers, Js, "${OpType}"]
+        - "Js${OpType}${Op}Resolver":
+            Type: AWS::AppSync::Resolver
+            DependsOn: GraphQLApiSchema
+            Properties:
+              ApiId: !GetAtt GraphQLApi.ApiId
+              DataSourceName: !GetAtt LambdaDatasource.Name
+              Kind: UNIT
+              TypeName: "${OpType}"
+              FieldName: "${Op}"
+              MaxBatchSize: 100
+              MetricsConfig: ENABLED
+  Fn::ForEach::VtlOps:
+    - OpType
+    - [Query, Mutation, Subscription]
+    - Fn::ForEach::Op:
+        - Op
+        - !FindInMap [AppSyncResolvers, Vtl, "${OpType}"]
+        - "Vtl${OpType}${Op}Resolver":
+            Type: AWS::AppSync::Resolver
+            DependsOn: GraphQLApiSchema
+            Properties:
+              ApiId: !GetAtt GraphQLApi.ApiId
+              DataSourceName: !GetAtt LambdaDatasource.Name
+              Kind: UNIT
+              TypeName: "${OpType}"
+              FieldName: "${Op}"
+              MaxBatchSize: 100
+              MetricsConfig: ENABLED
+
   #################
   # Backend table #
   #################
@@ -205,9 +285,7 @@ Resources:
                 Action: lambda:InvokeFunction
                 Resource: !GetAtt AppsyncSourceFunction.Arn
       Path: /
-  #############
-  # Resolvers #
-  #############
+
   # QueryTentativeGuestRequestsResolver:
   #   Type: AWS::AppSync::Resolver
   #   DependsOn: GraphQLApiSchema

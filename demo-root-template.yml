@@ -27,18 +27,18 @@ Resources:
       Tags:
         - Key: Project
           Value: !Ref ProjectName
-  # GraphQLApiStack:
-  #   Type: AWS::CloudFormation::Stack
-  #   Properties:
-  #     Parameters:
-  #       ProjectName: !Ref ProjectName
-  #       CognitoUserPoolId: !GetAtt CognitoStack.Outputs.CognitoUserPoolId
-  #       CognitoUserPoolClientId: !GetAtt CognitoStack.Outputs.CognitoUserPoolClientId
-  #     TemplateURL: ./templates/graphqlapi.yml
-  #     TimeoutInMinutes: 10
-  #     Tags:
-  #       - Key: Project
-  #         Value: !Ref ProjectName
+  GraphQLApiStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        ProjectName: !Ref ProjectName
+        CognitoUserPoolId: !GetAtt CognitoStack.Outputs.CognitoUserPoolId
+        CognitoUserPoolClientId: !GetAtt CognitoStack.Outputs.CognitoUserPoolClientId
+      TemplateURL: ./templates/graphqlapi.yml
+      TimeoutInMinutes: 10
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
 
 Outputs:
   StaticWebBucket:
@@ -56,9 +56,9 @@ Outputs:
   CognitoDomainName:
     Description: Domain of Cognito
     Value: !GetAtt CognitoStack.Outputs.CognitoDomainName
-  # GraphQLApiUrl:
-  #   Description: GraphQL API URL
-  #   Value: !GetAtt GraphQLApiStack.Outputs.ApiUrl
-  # GraphQLApiKey:
-  #   Description: The Public API key of the API
-  #   Value: !GetAtt GraphQLApiStack.Outputs.ApiKey
+  GraphQLApiUrl:
+    Description: GraphQL API URL
+    Value: !GetAtt GraphQLApiStack.Outputs.ApiUrl
+  GraphQLApiKey:
+    Description: The Public API key of the API
+    Value: !GetAtt GraphQLApiStack.Outputs.ApiKey
