@@ -170,18 +170,21 @@ impl crate::Operation {
         };
         let new_total_latency = old_total_latency + avg_latency * (clicks as f64);
         let new_avg_latency_clicks = old_avg_latency_clicks.unwrap_or_default() + clicks;
-        let new_avg_latency = new_total_latency / (new_avg_latency_clicks as f64);
-        dynamodb_update_player_latency_stats(
-            player_id,
-            old_avg_latency,
-            old_avg_latency_clicks,
-            new_avg_latency,
-            new_avg_latency_clicks,
-        )
-        .await?;
 
-        player.avg_latency = Some(new_avg_latency);
-        player.avg_latency_clicks = Some(new_avg_latency_clicks);
+        let new_avg_latency = new_total_latency / (new_avg_latency_clicks as f64);
+        if new_avg_latency.is_finite() {
+            dynamodb_update_player_latency_stats(
+                player_id,
+                old_avg_latency,
+                old_avg_latency_clicks,
+                new_avg_latency,
+                new_avg_latency_clicks,
+            )
+            .await?;
+
+            player.avg_latency = Some(new_avg_latency);
+            player.avg_latency_clicks = Some(new_avg_latency_clicks);
+        }
         Ok(player)
     }
 }

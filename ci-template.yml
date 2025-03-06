@@ -374,6 +374,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub root-stack-${ProjectName}
                 Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                OutputFileName: infra.outputs.json
                 TemplatePath: Infra::demo-root-template.yml
                 ParameterOverrides: !Sub '{"ProjectName": "${ProjectName}"}'
                 RoleArn: !GetAtt CFDeployerRole.Arn

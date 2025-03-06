@@ -18,6 +18,21 @@ provide('teams', teams);
 
 function update_game_status(status) {
   game_status.value = status;
+  if (status == 'RESET') {
+    reset_game();
+  }
+}
+function reset_game() {
+  players.forEach((p) => {
+    p.clicks = 0;
+    p.avg_latency = NaN;
+    p.avg_latency_clicks = 0;
+  });
+  teams.forEach((t) => {
+    t.total_clicks = 0;
+    t.avg_latency = NaN;
+    t.avg_latency_clicks = 0;
+  });
 }
 
 const registered_player_id = inject('registered_player_id');
@@ -27,30 +42,37 @@ const current_player = computed(() => {
 provide('current_player', current_player);
 
 function uncount_player(team, player) {
-  // Remove the share of click of the previous version
-  team.total_clicks -= player.clicks;
-  // Compute the avg_latency_clicks without the player
-  const old_avg_latency_clicks = team.avg_latency_clicks - player.avg_latency_clicks;
-  // Compute the total_added_latency without the player
-  const old_total_added_latency =
-    team.avg_latency * team.avg_latency_clicks - player.avg_latency * player.avg_latency_clicks;
+  if (player.clicks > 0) {
+    // Remove the share of click of the previous version
+    team.total_clicks -= player.clicks;
+    // Compute the avg_latency_clicks without the player
+    const old_avg_latency_clicks = team.avg_latency_clicks - player.avg_latency_clicks;
+    // Compute the total_added_latency without the player
+    const old_total_added_latency =
+      team.avg_latency * team.avg_latency_clicks - player.avg_latency * player.avg_latency_clicks;
 
-  // Update the team fields
-  team.avg_latency = old_total_added_latency / old_avg_latency_clicks;
-  team.avg_latency_clicks = old_avg_latency_clicks;
+    // Update the team fields
+    team.avg_latency = old_avg_latency_clicks
+      ? old_total_added_latency / old_avg_latency_clicks
+      : NaN;
+    team.avg_latency_clicks = old_avg_latency_clicks;
+  }
 }
 function count_player(team, player) {
-  // Add players clicks to the total
-  team.total_clicks += player.clicks;
-  // Compute the player's avg_latency_clicks
-  const avg_latency_clicks = team.avg_latency_clicks + player.avg_latency_clicks;
-  // Compute the total_added_latency with the player
-  const total_added_latency =
-    team.avg_latency * team.avg_latency_clicks + player.avg_latency * player.avg_latency_clicks;
+  if (player.clicks > 0) {
+    // Add players clicks to the total
+    team.total_clicks += player.clicks;
+    // Compute the player's avg_latency_clicks
+    const avg_latency_clicks = team.avg_latency_clicks + player.avg_latency_clicks;
+    // Compute the total_added_latency with the player
+    const total_added_latency =
+      (team.avg_latency_clicks ? team.avg_latency * team.avg_latency_clicks : 0.0) +
+      player.avg_latency * player.avg_latency_clicks;
 
-  // Update the team fields
-  team.avg_latency = total_added_latency / avg_latency_clicks;
-  team.avg_latency_clicks = avg_latency_clicks;
+    // Update the team fields
+    team.avg_latency = total_added_latency / avg_latency_clicks;
+    team.avg_latency_clicks = avg_latency_clicks;
+  }
 }
 
 function remove_player(player_id) {
@@ -74,7 +96,7 @@ function update_player(player) {
       team_name,
       players: [],
       total_clicks: 0,
-      avg_latency: 0,
+      avg_latency: NaN,
       avg_latency_clicks: 0,
     });
     // We set and then re-get to retrieve the Proxied object (we are in a reactive context)

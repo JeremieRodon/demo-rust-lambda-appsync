@@ -33,6 +33,8 @@ async function handle_register() {
         mutation registerNewPlayer($name: String!) {
             registerNewPlayer(name: $name) {
               id
+              name
+              team
             }
           }
       `,

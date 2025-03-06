@@ -2,12 +2,29 @@
 import CRegistration from '@/components/CRegistration.vue';
 import TeamIcon from '@/components/TeamIcon.vue';
 import TeamScore from '@/components/TeamScore.vue';
-import { team_to_displayname } from '@/modules/utils';
-import { computed, inject } from 'vue';
+import { alert_error, team_to_displayname } from '@/modules/utils';
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const current_player = inject('current_player');
 const teams = inject('teams');
 const game_status = inject('game_status');
+const client = inject('appsync_client');
+
+watch(game_status, () => {
+  if (game_status.value == 'STARTED') {
+    begin_reporting();
+  } else {
+    stop_reporting();
+  }
+});
+
+const current_player_id = computed(() => {
+  if (current_player.value) {
+    return current_player.value.id;
+  } else {
+    return null;
+  }
+});
 const current_player_name = computed(() => {
   if (current_player.value) {
     return current_player.value.name;
@@ -22,7 +39,6 @@ const current_player_team = computed(() => {
     return null;
   }
 });
-
 const current_player_team_name = computed(() => {
   return team_to_displayname(current_player_team.value);
 });
@@ -30,6 +46,132 @@ const sorted_teams = computed(() => {
   const sorted_teams = [...teams.values()];
   sorted_teams.sort((t1, t2) => t1.avg_latency - t2.avg_latency);
   return sorted_teams;
+});
+
+const latency_report_buffer = new Array();
+async function call_click() {
+  const player_id = current_player_id.value;
+  const variables = {
+    player_id,
+  };
+  console.log(variables);
+  let click_mutation;
+  switch (current_player_team.value) {
+    case 'RUST': {
+      click_mutation = 'clickRust';
+      break;
+    }
+    case 'JS': {
+      click_mutation = 'clickJs';
+      break;
+    }
+    case 'VTL': {
+      click_mutation = 'clickVtl';
+      break;
+    }
+  }
+  const start = Date.now();
+  try {
+    await client.graphql({
+      query: `
+        mutation click($player_id: ID!) {
+          ${click_mutation}(player_id: $player_id) {
+              id
+              name
+              team
+              clicks
+              avg_latency
+              avg_latency_clicks
+            }
+          }
+      `,
+      variables,
+    });
+  } catch (e) {
+    console.error(e);
+    alert_error('Could not click 😭');
+  } finally {
+    const duration = Date.now() - start;
+    latency_report_buffer.push(duration);
+  }
+}
+const report_timer = ref(null);
+function begin_reporting() {
+  if (report_timer.value == null) {
+    report_timer.value = setInterval(async () => await report_latency(), 1000);
+  }
+}
+function stop_reporting() {
+  if (report_timer.value != null) {
+    clearInterval(report_timer.value);
+    report_timer.value = null;
+  }
+}
+async function report_latency() {
+  console.log('report_latency');
+  const player_id = current_player_id.value;
+  const latencies = latency_report_buffer.splice(0, latency_report_buffer.length);
+  if (latencies.length == 0) {
+    return;
+  }
+  const clicks = latencies.length;
+  const avg_latency = latencies.reduce((acc, c) => acc + c, 0) / latencies.length;
+  const report = {
+    clicks,
+    avg_latency,
+  };
+  const variables = {
+    player_id,
+    report,
+  };
+  console.log(variables);
+  let report_latency_mutation;
+  switch (current_player_team.value) {
+    case 'RUST': {
+      report_latency_mutation = 'reportLatencyRust';
+      break;
+    }
+    case 'JS': {
+      report_latency_mutation = 'reportLatencyJs';
+      break;
+    }
+    case 'VTL': {
+      report_latency_mutation = 'reportLatencyVtl';
+      break;
+    }
+  }
+  try {
+    await client.graphql({
+      query: `
+        mutation reportLatency($player_id: ID!, $report: LatencyReport!) {
+          ${report_latency_mutation}(player_id: $player_id, report: $report) {
+              id
+              name
+              team
+              clicks
+              avg_latency
+              avg_latency_clicks
+            }
+          }
+      `,
+      variables,
+    });
+  } catch (e) {
+    console.error(e);
+    alert_error('Could not report 😭');
+  }
+}
+onMounted(() => {
+  console.log('onMounted BEGIN');
+  if (game_status.value == 'STARTED') {
+    begin_reporting();
+  }
+  console.log('onMounted END');
+});
+onUnmounted(() => {
+  console.log('onUnmounted BEGIN');
+  stop_reporting();
+  console.log('onUnmounted END');
 });
 </script>
 
@@ -54,6 +196,7 @@ const sorted_teams = computed(() => {
         <button
           class="btn uppercase btn-secondary font-black text-4xl py-16 px-8"
           :disabled="game_status != 'STARTED'"
+          @click="call_click"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-16 fill-current">
             <path

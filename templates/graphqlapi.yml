@@ -25,7 +25,6 @@ Globals:
     Environment:
       Variables:
         BACKEND_TABLE_NAME: !Ref BackendTable
-        USERPOOL_ID: !Ref CognitoUserPoolId
         RUST_LOG: debug,hyper=info,h2=info,tracing=info,aws_config=info,aws_smithy_runtime=info,aws_smithy_runtime_api=info,rustls=info
 
 Mappings:
@@ -286,6 +285,7 @@ Resources:
               - dynamodb:Scan
               - dynamodb:BatchGetItem
               - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
             Resource:
               - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
               - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
