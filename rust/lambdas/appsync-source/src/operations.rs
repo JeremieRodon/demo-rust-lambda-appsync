@@ -7,7 +7,7 @@ use crate::{
     dynamodb_utils::{
         dynamodb_delete_player, dynamodb_get_player, dynamodb_player_click,
         dynamodb_put_new_player, dynamodb_query_game_state, dynamodb_query_teams_player_count,
-        dynamodb_update_player_latency_stats, dynamodb_update_player_name,
+        dynamodb_reset_game, dynamodb_update_player_latency_stats, dynamodb_update_player_name,
     },
     GameState, GameStatus, LatencyReport, Player, Team,
 };
@@ -41,7 +41,18 @@ macro_rules! game_status_mut {
 
 game_status_mut!(mutation_start_game, GameStatus::Started);
 game_status_mut!(mutation_stop_game, GameStatus::Stopped);
-game_status_mut!(mutation_reset_game, GameStatus::Reset);
+
+impl crate::Operation {
+    pub async fn mutation_reset_game() -> Result<GameStatus, AppSyncError> {
+        // This is just a marker to ensure an error is thrown if the user did not chose
+        // the correct signature for the function. Should be optimized away by the compiler.
+        if false {
+            return <crate::Operation as crate::DefautOperations>::mutation_reset_game().await;
+        }
+        dynamodb_reset_game().await?;
+        Ok(GameStatus::Reset)
+    }
+}
 
 impl crate::Operation {
     pub async fn mutation_register_new_player(name: String) -> Result<Player, AppSyncError> {

@@ -12,8 +12,11 @@ provide('signed_user', signed_user);
 const registered_player_id = ref(null);
 provide('registered_player_id', registered_player_id);
 watch(registered_player_id, () => {
-  // Save the theme choice
-  window.localStorage.setItem('user_id', registered_player_id.value);
+  if (registered_player_id.value) {
+    window.localStorage.setItem('user_id', registered_player_id.value);
+  } else {
+    window.localStorage.removeItem('user_id');
+  }
 });
 
 // By default, we go in darkmode

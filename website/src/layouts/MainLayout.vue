@@ -121,9 +121,19 @@ async function load_game_state() {
     ).data.gameState;
     console.log(gs);
     update_game_status(gs.status);
+    let i_saw_me = false;
+    let my_id = registered_player_id.value;
     gs.players.forEach((p) => {
       update_player(p);
+      if (p.id == my_id) {
+        i_saw_me = true;
+      }
     });
+    // If we have an ID but it is not in the game state,
+    // better forget it...
+    if (my_id && !i_saw_me) {
+      registered_player_id.value = null;
+    }
   } catch (e) {
     console.error(e);
     alert_error('Could not retrieve the Game state 😭');
