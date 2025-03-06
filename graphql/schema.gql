@@ -35,8 +35,12 @@ type Subscription {
       mutations: [
         "registerNewPlayer"
         "updatePlayerName"
-        "click"
-        "reportLatency"
+        "clickRust"
+        "clickJs"
+        "clickVtl"
+        "reportLatencyRust"
+        "reportLatencyJs"
+        "reportLatencyVtl"
       ]
     )
   removedPlayer: Player
