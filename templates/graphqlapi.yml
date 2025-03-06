@@ -215,49 +215,80 @@ Resources:
         AwsRegion: !Ref AWS::Region
         TableName: !Ref BackendTable
         UseCallerCredentials: false
-      ServiceRoleArn: !GetAtt BackendTableAccessRole.Arn
-  BackendTableAccessRole:
+      ServiceRoleArn: !GetAtt BackendTableDatasourceRole.Arn
+  BackendTableDatasourceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub gql-lambda-${ProjectName}-dynamodb-access
+      RoleName: !Sub gql-${ProjectName}-dynamodb-access
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
             Principal:
-              Service: [appsync.amazonaws.com, lambda.amazonaws.com]
+              Service: appsync.amazonaws.com
             Action: sts:AssumeRole
-      Policies:
-        - PolicyName: dynamodb
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Sid: FullDataAccess
-                Effect: Allow
-                Action:
-                  - dynamodb:GetItem
-                  - dynamodb:PutItem
-                  - dynamodb:UpdateItem
-                  - dynamodb:DeleteItem
-                  - dynamodb:Query
-                  - dynamodb:Scan
-                  - dynamodb:BatchGetItem
-                  - dynamodb:BatchWriteItem
-                Resource:
-                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
-                  - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
       Path: /
   AppsyncSourceFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub ${ProjectName}-appsync-source
       CodeUri: ../rust/lambdas/appsync-source
-      Role: !GetAtt BackendTableAccessRole.Arn
+      Role: !GetAtt AppsyncSourceFunctionRole.Arn
   AppsyncSourceFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${AppsyncSourceFunction}
       RetentionInDays: 90
+  AppsyncSourceFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-dynamodb-access
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  AppsyncSourceFunctionRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncSourceFunctionRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt AppsyncSourceFunctionLogGroup.Arn
+  BackendTableAccessRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncSourceFunctionRole
+        - !Ref BackendTableDatasourceRole
+      PolicyName: dynamodb
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: FullDataAccess
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
   LambdaDatasource:
     Type: AWS::AppSync::DataSource
     Properties:
