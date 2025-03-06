@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use shared_types::common::Uuid;
 
 use crate::{
@@ -7,7 +9,7 @@ use crate::{
         dynamodb_put_new_player, dynamodb_query_game_state, dynamodb_query_teams_player_count,
         dynamodb_update_player_latency_stats, dynamodb_update_player_name,
     },
-    GameState, GameStatus, LatencyReport, Player,
+    GameState, GameStatus, LatencyReport, Player, Team,
 };
 
 impl crate::Operation {
@@ -52,9 +54,22 @@ impl crate::Operation {
             .await;
         }
         let mut teams_player_count = dynamodb_query_teams_player_count().await?;
-        teams_player_count.sort_by_key(|o| o.1);
+        let team = if teams_player_count.len() < Team::TEAM_COUNT {
+            // If all teams are not yet used, choose one of the unused
+            let mut all_teams = HashSet::from(Team::all());
+            while let Some((team, _)) = teams_player_count.pop() {
+                all_teams.remove(&team);
+            }
+            all_teams
+                .into_iter()
+                .next()
+                .expect("we ensured teams_player_count had less element than all_teams")
+        } else {
+            // Else chose the one with less players
+            teams_player_count.sort_by_key(|o| o.1);
+            teams_player_count[0].0
+        };
         let id = Uuid::new_v4();
-        let team = teams_player_count[0].0;
         let new_player = Player {
             id,
             name,
