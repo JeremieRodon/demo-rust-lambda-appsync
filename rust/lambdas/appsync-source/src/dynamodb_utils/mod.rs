@@ -3,7 +3,7 @@ mod generic;
 use std::collections::HashMap;
 
 use aws_sdk_dynamodb::types::{
-    builders::{DeleteRequestBuilder, UpdateBuilder},
+    builders::{DeleteRequestBuilder, PutRequestBuilder, UpdateBuilder},
     AttributeValue, ConditionCheck, ReturnValue, TransactWriteItem, Update, WriteRequest,
 };
 use generic::{
@@ -182,6 +182,19 @@ impl Player {
     fn pk_from_uuid(id: Uuid) -> String {
         format!("PLAYER#{}", id)
     }
+    fn destructure_clicks(&self) -> PlayerClicks {
+        PlayerClicks {
+            id: self.id,
+            clicks: self.clicks,
+        }
+    }
+    fn destructure_latency(&self) -> PlayerLatency {
+        PlayerLatency {
+            id: self.id,
+            avg_latency: self.avg_latency,
+            avg_latency_clicks: self.avg_latency_clicks,
+        }
+    }
     fn restructure_clicks(&mut self, clicks: PlayerClicks) {
         assert_eq!(self.id, clicks.id);
         let PlayerClicks { clicks, .. } = clicks;
@@ -203,21 +216,6 @@ impl Player {
     }
 }
 
-pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_put_new_player - new_player={new_player:?}");
-
-    // No need to destructure or anything: a new player always has clicks/avg_latency/avg_latency_clicks to none
-    // Even if it did not, we don't really care...
-    dynamodb()
-        .put_item()
-        .table_name(table_name())
-        .set_item(Some(new_player.to_item()))
-        .condition_expression(format!("attribute_not_exists({PK})"))
-        .return_values(ReturnValue::None)
-        .send()
-        .await?;
-    Ok(())
-}
 pub async fn dynamodb_update_if_game_started(
     transcat_update: Update,
 ) -> Result<(), aws_sdk_dynamodb::Error> {
@@ -248,6 +246,50 @@ pub async fn dynamodb_update_if_game_started(
         .await?;
     Ok(())
 }
+
+pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_dynamodb::Error> {
+    log::debug!("ENTER dynamodb_put_new_player - new_player={new_player:?}");
+
+    // No need to destructure or anything: a new player always has clicks/avg_latency/avg_latency_clicks to none
+    // Even if it did not, we don't really care...
+    dynamodb()
+        .put_item()
+        .table_name(table_name())
+        .set_item(Some(new_player.to_item()))
+        .condition_expression(format!("attribute_not_exists({PK})"))
+        .return_values(ReturnValue::None)
+        .send()
+        .await?;
+
+    let batch_write_requests = vec![
+        WriteRequest::builder()
+            .put_request(
+                PutRequestBuilder::default()
+                    .set_item(Some(new_player.to_item()))
+                    .build()
+                    .expect("item is set"),
+            )
+            .build(),
+        WriteRequest::builder()
+            .put_request(
+                PutRequestBuilder::default()
+                    .set_item(Some(new_player.destructure_clicks().to_item()))
+                    .build()
+                    .expect("item is set"),
+            )
+            .build(),
+        WriteRequest::builder()
+            .put_request(
+                PutRequestBuilder::default()
+                    .set_item(Some(new_player.destructure_latency().to_item()))
+                    .build()
+                    .expect("item is set"),
+            )
+            .build(),
+    ];
+    dynamodb_batch_write(batch_write_requests).await?;
+    Ok(())
+}
 pub async fn dynamodb_update_player_name(
     player_id: Uuid,
     new_name: String,
@@ -268,6 +310,83 @@ pub async fn dynamodb_update_player_name(
         .expect("asked for them");
     Ok(Player::from_item(updated_item))
 }
+pub async fn dynamodb_get_player(
+    player_id: Uuid,
+) -> Result<Option<Player>, aws_sdk_dynamodb::Error> {
+    log::debug!("ENTER dynamodb_get_player - player_id={player_id}");
+
+    let query = dynamodb()
+        .query()
+        .table_name(table_name())
+        .key_condition_expression(format!("{PK} = :player_id"))
+        .expression_attribute_values(
+            ":player_id",
+            AttributeValue::S(Player::pk_from_uuid(player_id)),
+        )
+        // This is to ensure that 1PLAYER_META is the last of the list
+        .scan_index_forward(false);
+    let mut items = dynamodb_perform_query(query).await?;
+
+    // The 1PLAYER_META object is guaranteed to be the last of the list by DynamoDB
+    // Therefore it is the first to be pop
+    let player = if let Some(item) = items.pop() {
+        let mut player = Player::from_item(item);
+        while let Some(item) = items.pop() {
+            if PlayerClicks::is_item(&item) {
+                let clicks = PlayerClicks::from_item(item);
+                player.restructure_clicks(clicks);
+            } else if PlayerLatency::is_item(&item) {
+                let latency = PlayerLatency::from_item(item);
+                player.restructure_latency(latency);
+            }
+        }
+        Some(player)
+    } else {
+        None
+    };
+
+    Ok(player)
+}
+pub async fn dynamodb_delete_player(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
+    log::debug!("ENTER dynamodb_delete_player - player_id={player_id}");
+
+    let req_delete_player = tokio::spawn(dynamodb_delete_item(Player::get_key_from_id(player_id)));
+    let req_delete_player_clicks = tokio::spawn(dynamodb_delete_item(
+        PlayerClicks::get_key_from_id(player_id),
+    ));
+    let req_delete_player_latency = tokio::spawn(dynamodb_delete_item(
+        PlayerLatency::get_key_from_id(player_id),
+    ));
+
+    let mut player = Player::from_item(req_delete_player.await.unwrap()?);
+    let clicks = PlayerClicks::from_item(req_delete_player_clicks.await.unwrap()?);
+    let latency = PlayerLatency::from_item(req_delete_player_latency.await.unwrap()?);
+    player.restructure(clicks, latency);
+
+    Ok(player)
+}
+
+pub async fn dynamodb_player_click(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
+    log::debug!("ENTER dynamodb_player_click - player_id={player_id}");
+
+    dynamodb_update_if_game_started(
+        UpdateBuilder::default()
+            .table_name(table_name())
+            .set_key(Some(PlayerClicks::get_key_from_id(player_id)))
+            .update_expression("SET clicks = if_not_exists(clicks, :zero) + :one")
+            .condition_expression(format!("attribute_exists({PK})"))
+            .expression_attribute_values(":zero", AttributeValue::N("0".to_owned()))
+            .expression_attribute_values(":one", AttributeValue::N("1".to_owned()))
+            .build()
+            .expect("table_name, key and update_expression are set"),
+    )
+    .await?;
+
+    dynamodb_get_player(player_id)
+        .await
+        .map(|op| op.expect("player deleted at an incredible timing that I don't want to manage"))
+}
+
 pub async fn dynamodb_update_player_latency_stats(
     player_id: Uuid,
     old_avg_latency: Option<f64>,
@@ -327,79 +446,6 @@ pub async fn dynamodb_update_player_latency_stats(
 
     dynamodb_update_if_game_started(
         update
-            .build()
-            .expect("table_name, key and update_expression are set"),
-    )
-    .await?;
-
-    dynamodb_get_player(player_id)
-        .await
-        .map(|op| op.expect("player deleted at an incredible timing that I don't want to manage"))
-}
-pub async fn dynamodb_get_player(
-    player_id: Uuid,
-) -> Result<Option<Player>, aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_get_player - player_id={player_id}");
-
-    let query = dynamodb()
-        .query()
-        .table_name(table_name())
-        .key_condition_expression(format!("{PK} = :player_id"))
-        .expression_attribute_values(":player_id", AttributeValue::S(player_id.to_string()))
-        // This is to ensure that 1PLAYER_META is the last of the list
-        .scan_index_forward(false);
-    let mut items = dynamodb_perform_query(query).await?;
-
-    // The 1PLAYER_META object is guaranteed to be the last of the list by DynamoDB
-    // Therefore it is the first to be pop
-    let player = if let Some(item) = items.pop() {
-        let mut player = Player::from_item(item);
-        while let Some(item) = items.pop() {
-            if PlayerClicks::is_item(&item) {
-                let clicks = PlayerClicks::from_item(item);
-                player.restructure_clicks(clicks);
-            } else if PlayerLatency::is_item(&item) {
-                let latency = PlayerLatency::from_item(item);
-                player.restructure_latency(latency);
-            }
-        }
-        Some(player)
-    } else {
-        None
-    };
-
-    Ok(player)
-}
-pub async fn dynamodb_delete_player(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_delete_player - player_id={player_id}");
-
-    let req_delete_player = tokio::spawn(dynamodb_delete_item(Player::get_key_from_id(player_id)));
-    let req_delete_player_clicks = tokio::spawn(dynamodb_delete_item(
-        PlayerClicks::get_key_from_id(player_id),
-    ));
-    let req_delete_player_latency = tokio::spawn(dynamodb_delete_item(
-        PlayerLatency::get_key_from_id(player_id),
-    ));
-
-    let mut player = Player::from_item(req_delete_player.await.unwrap()?);
-    let clicks = PlayerClicks::from_item(req_delete_player_clicks.await.unwrap()?);
-    let latency = PlayerLatency::from_item(req_delete_player_latency.await.unwrap()?);
-    player.restructure(clicks, latency);
-
-    Ok(player)
-}
-
-pub async fn dynamodb_player_click(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_player_click - player_id={player_id}");
-
-    dynamodb_update_if_game_started(
-        UpdateBuilder::default()
-            .table_name(table_name())
-            .set_key(Some(PlayerClicks::get_key_from_id(player_id)))
-            .update_expression("SET clicks = if_not_exists(clicks, :zero) + :one")
-            .condition_expression(format!("attribute_exists({PK})"))
-            .expression_attribute_values(":zero", AttributeValue::N("0".to_owned()))
-            .expression_attribute_values(":one", AttributeValue::N("1".to_owned()))
             .build()
             .expect("table_name, key and update_expression are set"),
     )
