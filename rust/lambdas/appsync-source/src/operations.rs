@@ -7,9 +7,9 @@ use crate::{
     appsync_utils::AppSyncError,
     dynamodb_utils::{
         dynamodb_delete_player, dynamodb_get_game_status, dynamodb_get_player,
-        dynamodb_player_click, dynamodb_put_new_player, dynamodb_query_game_state,
-        dynamodb_query_teams_player_count, dynamodb_reset_game,
-        dynamodb_update_player_latency_stats, dynamodb_update_player_name,
+        dynamodb_put_new_player, dynamodb_query_game_state, dynamodb_query_teams_player_count,
+        dynamodb_reset_game, dynamodb_update_player_click, dynamodb_update_player_latency_stats,
+        dynamodb_update_player_name,
     },
     GameState, GameStatus, LatencyReport, Player, Team,
 };
@@ -151,7 +151,7 @@ impl crate::Operation {
         if game_status != GameStatus::Started {
             return Err(invalid_game_status());
         }
-        Ok(dynamodb_player_click(player_id).await?)
+        Ok(dynamodb_update_player_click(player_id).await?)
     }
 }
 

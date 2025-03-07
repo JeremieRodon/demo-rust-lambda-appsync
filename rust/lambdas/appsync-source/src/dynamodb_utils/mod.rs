@@ -192,7 +192,9 @@ pub async fn dynamodb_delete_player(
         .map(Player::from_item))
 }
 
-pub async fn dynamodb_player_click(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
+pub async fn dynamodb_update_player_click(
+    player_id: Uuid,
+) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_player_click - player_id={player_id}");
     Ok(dynamodb()
         .update_item()
@@ -269,6 +271,7 @@ pub async fn dynamodb_update_player_latency_stats(
         ),
     };
     Ok(update
+        .return_values(ReturnValue::AllNew)
         .send()
         .await?
         .attributes
