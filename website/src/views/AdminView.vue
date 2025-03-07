@@ -59,7 +59,7 @@ async function reset_game() {
         }}</span>
       </div>
     </div>
-    <div class="flex flex-row gap-4">
+    <div class="flex flex-col sm:flex-row gap-4">
       <button
         class="btn btn-primary uppercase"
         tabindex="-1"

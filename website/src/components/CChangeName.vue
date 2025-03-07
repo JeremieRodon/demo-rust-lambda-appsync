@@ -27,6 +27,13 @@ watch(current_player_name, () => {
 });
 const player_name_error = ref(null);
 
+const pseudo = ref(null);
+watch(open, () => {
+  if (open.value) {
+    setTimeout(() => pseudo.value.focus(), 100);
+  }
+});
+
 const in_operation = ref(false);
 
 const client = inject('appsync_client');
@@ -77,6 +84,7 @@ async function change_name() {
           v-model="player_name"
           v-model:error="player_name_error"
           tabindex="1"
+          ref="pseudo"
           name="pseudo"
           placeholder="The GOAT 🐐"
           autocomplete="off"

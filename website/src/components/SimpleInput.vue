@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, ref, watch, watchEffect } from 'vue';
+import { computed, inject, nextTick, onMounted, ref, watch, watchEffect } from 'vue';
 
 const model = defineModel();
 const error_model = defineModel('error');
@@ -20,6 +20,12 @@ const props = defineProps({
 defineOptions({
   inheritAttrs: false,
 });
+
+const input = ref();
+function focus() {
+  input.value.focus();
+}
+defineExpose({ focus });
 
 const read_only = inject('read_only', false);
 const show_error = ref({ show: false, force_show: false, timer: null });
@@ -103,6 +109,7 @@ function immediate_feedback() {
         v-model.trim="local_value_copy"
         :id="id"
         :name="name"
+        ref="input"
         class="input input-bordered placeholder:text-base-content/20"
         :class="show_error.show ? ['input-error'] : []"
         v-bind="$attrs"

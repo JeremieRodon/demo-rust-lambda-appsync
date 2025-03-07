@@ -43,19 +43,11 @@ Mappings:
           reportLatencyRust,
         ]
       Subscription: [updatedPlayer, removedPlayer, updatedGameStatus]
-    Js:
-      Query: []
-      Mutation: [clickJs, reportLatencyJs]
-      Subscription: []
-    Vtl:
-      Query: []
-      Mutation: [clickVtl, reportLatencyVtl]
-      Subscription: []
 
 Resources:
-  #############################
-  # AppSync GraphQL Resolvers #
-  #############################
+  ##################################
+  # Rust AppSync GraphQL Resolvers #
+  ##################################
   "Fn::ForEach::RustOps":
     - OpType
     - [Query, Mutation, Subscription]
@@ -63,40 +55,6 @@ Resources:
         - Op
         - !FindInMap [AppSyncResolvers, Rust, !Ref OpType]
         - "Rust${OpType}${Op}Resolver":
-            Type: AWS::AppSync::Resolver
-            DependsOn: GraphQLApiSchema
-            Properties:
-              ApiId: !GetAtt GraphQLApi.ApiId
-              DataSourceName: !GetAtt LambdaDatasource.Name
-              Kind: UNIT
-              TypeName: !Ref OpType
-              FieldName: !Ref Op
-              MaxBatchSize: 100
-              MetricsConfig: ENABLED
-  Fn::ForEach::JsOps:
-    - OpType
-    - [Query, Mutation, Subscription]
-    - Fn::ForEach::Op:
-        - Op
-        - !FindInMap [AppSyncResolvers, Js, !Ref OpType]
-        - "Js${OpType}${Op}Resolver":
-            Type: AWS::AppSync::Resolver
-            DependsOn: GraphQLApiSchema
-            Properties:
-              ApiId: !GetAtt GraphQLApi.ApiId
-              DataSourceName: !GetAtt LambdaDatasource.Name
-              Kind: UNIT
-              TypeName: !Ref OpType
-              FieldName: !Ref Op
-              MaxBatchSize: 100
-              MetricsConfig: ENABLED
-  Fn::ForEach::VtlOps:
-    - OpType
-    - [Query, Mutation, Subscription]
-    - Fn::ForEach::Op:
-        - Op
-        - !FindInMap [AppSyncResolvers, Vtl, !Ref OpType]
-        - "Vtl${OpType}${Op}Resolver":
             Type: AWS::AppSync::Resolver
             DependsOn: GraphQLApiSchema
             Properties:
