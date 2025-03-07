@@ -3,22 +3,20 @@ mod generic;
 use std::collections::HashMap;
 
 use aws_sdk_dynamodb::types::{
-    builders::{DeleteRequestBuilder, PutRequestBuilder, UpdateBuilder},
-    AttributeValue, ConditionCheck, ReturnValue, TransactWriteItem, Update, WriteRequest,
+    builders::PutRequestBuilder, AttributeValue, ReturnValue, WriteRequest,
 };
 use generic::{
-    dynamodb_batch_write, dynamodb_delete_item, dynamodb_perform_query, dynamodb_perform_scan,
-    table_name, DynamoDBItem, DynamoItem, PK, SK, TYPE,
+    dynamodb_batch_write, dynamodb_delete_item, dynamodb_perform_scan, table_name, DynamoDBItem,
+    DynamoItem, PK, TYPE,
 };
-use lambda_commons_utils::{log, tokio};
-use serde::{Deserialize, Serialize};
+use lambda_commons_utils::log;
 use serde_dynamo::{from_attribute_value, to_attribute_value};
 use shared_types::common::Uuid;
 
 use crate::{dynamodb, GameState, GameStatus, Player, Team};
 
 impl GameStatus {
-    const PK_SK_TYPE: &'static str = "GAME_STATUS";
+    const PK_TYPE: &'static str = "GAME_STATUS";
     const PROPERTY_NAME: &'static str = "game_status";
 }
 impl DynamoDBItem for GameStatus {
@@ -27,19 +25,10 @@ impl DynamoDBItem for GameStatus {
         Self::get_key_from_id(())
     }
     fn get_key_from_id(_id: Self::Id) -> DynamoItem {
-        HashMap::from([
-            (
-                PK.to_owned(),
-                AttributeValue::S(Self::PK_SK_TYPE.to_owned()),
-            ),
-            (
-                SK.to_owned(),
-                AttributeValue::S(Self::PK_SK_TYPE.to_owned()),
-            ),
-        ])
+        HashMap::from([(PK.to_owned(), AttributeValue::S(Self::PK_TYPE.to_owned()))])
     }
     fn get_type() -> &'static str {
-        Self::PK_SK_TYPE
+        Self::PK_TYPE
     }
     fn to_item(&self) -> DynamoItem {
         let mut item = self.to_item_core();
@@ -70,30 +59,22 @@ pub async fn dynamodb_reset_game() -> Result<(), aws_sdk_dynamodb::Error> {
     // List players
     let GameState { players, .. } = dynamodb_query_game_state().await?;
 
-    // Create the iterator of BatchWriteRequest that will DELETE every player CLICKS and LATENCY
+    // Create the iterator of BatchWriteRequest that will PUT every players without clicks/latency
     let batch_write_requests = players
         .into_iter()
-        .flat_map(|player| {
-            let id = player.id;
-            // Create the two BatchWriteRequest
-            [
-                WriteRequest::builder()
-                    .delete_request(
-                        DeleteRequestBuilder::default()
-                            .set_key(Some(PlayerClicks::get_key_from_id(id)))
-                            .build()
-                            .expect("key is set"),
-                    )
-                    .build(),
-                WriteRequest::builder()
-                    .delete_request(
-                        DeleteRequestBuilder::default()
-                            .set_key(Some(PlayerLatency::get_key_from_id(id)))
-                            .build()
-                            .expect("key is set"),
-                    )
-                    .build(),
-            ]
+        .map(|mut player| {
+            player.clicks = None;
+            player.avg_latency = None;
+            player.avg_latency_clicks = None;
+            // Create the BatchWriteRequest
+            WriteRequest::builder()
+                .put_request(
+                    PutRequestBuilder::default()
+                        .set_item(Some(player.to_item()))
+                        .build()
+                        .expect("item is set"),
+                )
+                .build()
         })
         .collect::<Vec<_>>();
     dynamodb_batch_write(batch_write_requests).await
@@ -118,140 +99,43 @@ pub async fn dynamodb_set_game_status(status: GameStatus) -> Result<(), aws_sdk_
         .await?;
     Ok(())
 }
+pub async fn dynamodb_get_game_status() -> Result<Option<GameStatus>, aws_sdk_dynamodb::Error> {
+    log::debug!("ENTER dynamodb_get_game_status");
 
-// We destructure the Player object into 3 pieces
-// The goal is to have "Clicks" and "LatencyReports" in different items.
-// Before implementing this, I had regular errors during the game because
-// it happens (quite often) that a `click` request and a `reportLatency` request
-// arrive at the same time and, as they both use a transaction to perform their update,
-// they would conflict and one of them was dropped.
-
-// By destructuring, we increase complexity. But in exchange we have "Clicks" and "LatencyReports" in different items,
-// we means their transactions cannot conflict anymore.
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-struct PlayerClicks {
-    pub id: Uuid,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub clicks: Option<i64>,
+    Ok(dynamodb()
+        .get_item()
+        .table_name(table_name())
+        .set_key(Some(GameStatus::get_key_from_id(())))
+        .send()
+        .await?
+        .item
+        .map(GameStatus::from_item))
 }
-impl PlayerClicks {
-    const SK_TYPE: &'static str = "2PLAYER_CLICKS";
-}
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-struct PlayerLatency {
-    pub id: Uuid,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avg_latency: Option<f64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avg_latency_clicks: Option<i64>,
-}
-impl PlayerLatency {
-    const SK_TYPE: &'static str = "3PLAYER_LATENCY";
-}
-
-macro_rules! impl_dbitem {
-    ($struct:ident) => {
-        impl DynamoDBItem for $struct {
-            type Id = Uuid;
-
-            fn get_key_from_id(id: Self::Id) -> DynamoItem {
-                HashMap::from([
-                    (PK.to_owned(), AttributeValue::S(Player::pk_from_uuid(id))),
-                    (SK.to_owned(), AttributeValue::S(Self::SK_TYPE.to_owned())),
-                ])
-            }
-
-            fn get_key(&self) -> DynamoItem {
-                Self::get_key_from_id(self.id)
-            }
-
-            fn get_type() -> &'static str {
-                Self::SK_TYPE
-            }
-        }
-    };
-}
-
-impl_dbitem!(Player);
-impl_dbitem!(PlayerClicks);
-impl_dbitem!(PlayerLatency);
 
 impl Player {
-    const SK_TYPE: &'static str = "1PLAYER_META";
+    const PK_TYPE: &'static str = "PLAYER";
     fn pk_from_uuid(id: Uuid) -> String {
-        format!("PLAYER#{}", id)
-    }
-    fn destructure_clicks(&self) -> PlayerClicks {
-        PlayerClicks {
-            id: self.id,
-            clicks: self.clicks,
-        }
-    }
-    fn destructure_latency(&self) -> PlayerLatency {
-        PlayerLatency {
-            id: self.id,
-            avg_latency: self.avg_latency,
-            avg_latency_clicks: self.avg_latency_clicks,
-        }
-    }
-    fn restructure_clicks(&mut self, clicks: PlayerClicks) {
-        assert_eq!(self.id, clicks.id);
-        let PlayerClicks { clicks, .. } = clicks;
-        self.clicks = clicks;
-    }
-    fn restructure_latency(&mut self, latency: PlayerLatency) {
-        assert_eq!(self.id, latency.id);
-        let PlayerLatency {
-            avg_latency,
-            avg_latency_clicks,
-            ..
-        } = latency;
-        self.avg_latency = avg_latency;
-        self.avg_latency_clicks = avg_latency_clicks;
-    }
-    fn restructure(&mut self, clicks: PlayerClicks, latency: PlayerLatency) {
-        self.restructure_clicks(clicks);
-        self.restructure_latency(latency);
+        format!("{}#{}", Self::PK_TYPE, id)
     }
 }
 
-pub async fn dynamodb_update_if_game_started(
-    transcat_update: Update,
-) -> Result<(), aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_update_if_game_started");
-    dynamodb()
-        .transact_write_items()
-        .transact_items(TransactWriteItem::builder().update(transcat_update).build())
-        .transact_items(
-            TransactWriteItem::builder()
-                .condition_check(
-                    ConditionCheck::builder()
-                        .table_name(table_name())
-                        .set_key(Some(GameStatus::get_key_from_id(())))
-                        .condition_expression(format!(
-                            "attribute_exists({PK}) AND {} = :game_status",
-                            GameStatus::PROPERTY_NAME
-                        ))
-                        .expression_attribute_values(
-                            ":game_status",
-                            to_attribute_value(GameStatus::Started).unwrap(),
-                        )
-                        .build()
-                        .expect("table_name, key and update_expression are set"),
-                )
-                .build(),
-        )
-        .send()
-        .await?;
-    Ok(())
+impl DynamoDBItem for Player {
+    type Id = Uuid;
+
+    fn get_key(&self) -> DynamoItem {
+        Self::get_key_from_id(self.id)
+    }
+    fn get_key_from_id(id: Self::Id) -> DynamoItem {
+        HashMap::from([(PK.to_owned(), AttributeValue::S(Self::pk_from_uuid(id)))])
+    }
+    fn get_type() -> &'static str {
+        Self::PK_TYPE
+    }
 }
 
 pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_put_new_player - new_player={new_player:?}");
 
-    // No need to destructure or anything: a new player always has clicks/avg_latency/avg_latency_clicks to none
-    // Even if it did not, we don't really care...
     dynamodb()
         .put_item()
         .table_name(table_name())
@@ -261,33 +145,6 @@ pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_
         .send()
         .await?;
 
-    let batch_write_requests = vec![
-        WriteRequest::builder()
-            .put_request(
-                PutRequestBuilder::default()
-                    .set_item(Some(new_player.to_item()))
-                    .build()
-                    .expect("item is set"),
-            )
-            .build(),
-        WriteRequest::builder()
-            .put_request(
-                PutRequestBuilder::default()
-                    .set_item(Some(new_player.destructure_clicks().to_item()))
-                    .build()
-                    .expect("item is set"),
-            )
-            .build(),
-        WriteRequest::builder()
-            .put_request(
-                PutRequestBuilder::default()
-                    .set_item(Some(new_player.destructure_latency().to_item()))
-                    .build()
-                    .expect("item is set"),
-            )
-            .build(),
-    ];
-    dynamodb_batch_write(batch_write_requests).await?;
     Ok(())
 }
 pub async fn dynamodb_update_player_name(
@@ -295,7 +152,8 @@ pub async fn dynamodb_update_player_name(
     new_name: String,
 ) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_update_player_name - player_id={player_id} new_name={new_name}");
-    let updated_item = dynamodb()
+
+    Ok(dynamodb()
         .update_item()
         .table_name(table_name())
         .set_key(Some(Player::get_key_from_id(player_id)))
@@ -307,84 +165,50 @@ pub async fn dynamodb_update_player_name(
         .send()
         .await?
         .attributes
-        .expect("asked for them");
-    Ok(Player::from_item(updated_item))
+        .map(Player::from_item)
+        .expect("asked for them"))
 }
 pub async fn dynamodb_get_player(
     player_id: Uuid,
 ) -> Result<Option<Player>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_get_player - player_id={player_id}");
 
-    let query = dynamodb()
-        .query()
+    Ok(dynamodb()
+        .get_item()
         .table_name(table_name())
-        .key_condition_expression(format!("{PK} = :player_id"))
-        .expression_attribute_values(
-            ":player_id",
-            AttributeValue::S(Player::pk_from_uuid(player_id)),
-        )
-        // This is to ensure that 1PLAYER_META is the last of the list
-        .scan_index_forward(false);
-    let mut items = dynamodb_perform_query(query).await?;
-
-    // The 1PLAYER_META object is guaranteed to be the last of the list by DynamoDB
-    // Therefore it is the first to be pop
-    let player = if let Some(item) = items.pop() {
-        let mut player = Player::from_item(item);
-        while let Some(item) = items.pop() {
-            if PlayerClicks::is_item(&item) {
-                let clicks = PlayerClicks::from_item(item);
-                player.restructure_clicks(clicks);
-            } else if PlayerLatency::is_item(&item) {
-                let latency = PlayerLatency::from_item(item);
-                player.restructure_latency(latency);
-            }
-        }
-        Some(player)
-    } else {
-        None
-    };
-
-    Ok(player)
+        .set_key(Some(Player::get_key_from_id(player_id)))
+        .send()
+        .await?
+        .item
+        .map(Player::from_item))
 }
-pub async fn dynamodb_delete_player(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
+pub async fn dynamodb_delete_player(
+    player_id: Uuid,
+) -> Result<Option<Player>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_delete_player - player_id={player_id}");
 
-    let req_delete_player = tokio::spawn(dynamodb_delete_item(Player::get_key_from_id(player_id)));
-    let req_delete_player_clicks = tokio::spawn(dynamodb_delete_item(
-        PlayerClicks::get_key_from_id(player_id),
-    ));
-    let req_delete_player_latency = tokio::spawn(dynamodb_delete_item(
-        PlayerLatency::get_key_from_id(player_id),
-    ));
-
-    let mut player = Player::from_item(req_delete_player.await.unwrap()?);
-    let clicks = PlayerClicks::from_item(req_delete_player_clicks.await.unwrap()?);
-    let latency = PlayerLatency::from_item(req_delete_player_latency.await.unwrap()?);
-    player.restructure(clicks, latency);
-
-    Ok(player)
+    Ok(dynamodb_delete_item(Player::get_key_from_id(player_id))
+        .await?
+        .map(Player::from_item))
 }
 
 pub async fn dynamodb_player_click(player_id: Uuid) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_player_click - player_id={player_id}");
-
-    dynamodb_update_if_game_started(
-        UpdateBuilder::default()
-            .table_name(table_name())
-            .set_key(Some(PlayerClicks::get_key_from_id(player_id)))
-            .update_expression("SET clicks = if_not_exists(clicks, :zero) + :one")
-            .condition_expression(format!("attribute_exists({PK})"))
-            .expression_attribute_values(":zero", AttributeValue::N("0".to_owned()))
-            .expression_attribute_values(":one", AttributeValue::N("1".to_owned()))
-            .build()
-            .expect("table_name, key and update_expression are set"),
-    )
-    .await?;
-
-    dynamodb_get_player(player_id)
-        .await
-        .map(|op| op.expect("player deleted at an incredible timing that I don't want to manage"))
+    Ok(dynamodb()
+        .update_item()
+        .table_name(table_name())
+        .set_key(Some(Player::get_key_from_id(player_id)))
+        .update_expression("SET #clicks = if_not_exists(#clicks, :zero) + :one")
+        .expression_attribute_names("#clicks", "clicks")
+        .expression_attribute_values(":zero", AttributeValue::N("0".to_owned()))
+        .expression_attribute_values(":one", AttributeValue::N("1".to_owned()))
+        .condition_expression(format!("attribute_exists({PK})"))
+        .return_values(ReturnValue::AllNew)
+        .send()
+        .await?
+        .attributes
+        .map(Player::from_item)
+        .expect("asked for them"))
 }
 
 pub async fn dynamodb_update_player_latency_stats(
@@ -402,9 +226,10 @@ pub async fn dynamodb_update_player_latency_stats(
         "
     );
 
-    let update = UpdateBuilder::default()
+    let update = dynamodb()
+        .update_item()
         .table_name(table_name())
-        .set_key(Some(PlayerLatency::get_key_from_id(player_id)))
+        .set_key(Some(Player::get_key_from_id(player_id)))
         .update_expression(
             "SET #avg_latency = :new_avg_latency, \
         #avg_latency_clicks = :new_avg_latency_clicks",
@@ -443,17 +268,12 @@ pub async fn dynamodb_update_player_latency_stats(
             can only be both None or both Some"
         ),
     };
-
-    dynamodb_update_if_game_started(
-        update
-            .build()
-            .expect("table_name, key and update_expression are set"),
-    )
-    .await?;
-
-    dynamodb_get_player(player_id)
-        .await
-        .map(|op| op.expect("player deleted at an incredible timing that I don't want to manage"))
+    Ok(update
+        .send()
+        .await?
+        .attributes
+        .map(Player::from_item)
+        .expect("asked for them"))
 }
 
 pub async fn dynamodb_query_teams_player_count(
@@ -518,16 +338,9 @@ pub async fn dynamodb_query_game_state() -> Result<GameState, aws_sdk_dynamodb::
     // Now, we will have every "PLAYER_META" players, we can proceed with PLAYER_CLICKS & PLAYER_LATENCY
     // And also GameStatus
     for item in second_pass {
-        if PlayerClicks::is_item(&item) {
-            let clicks = PlayerClicks::from_item(item);
-            if let Some(player) = players.get_mut(&clicks.id) {
-                player.restructure_clicks(clicks);
-            }
-        } else if PlayerLatency::is_item(&item) {
-            let latency = PlayerLatency::from_item(item);
-            if let Some(player) = players.get_mut(&latency.id) {
-                player.restructure_latency(latency);
-            }
+        if Player::is_item(&item) {
+            let player = Player::from_item(item);
+            game_state.players.push(player);
         } else if GameStatus::is_item(&item) {
             game_state.status = GameStatus::from_item(item);
         }

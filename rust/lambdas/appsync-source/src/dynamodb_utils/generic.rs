@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use aws_sdk_dynamodb::{
-    operation::{query::builders::QueryFluentBuilder, scan::builders::ScanFluentBuilder},
+    operation::scan::builders::ScanFluentBuilder,
     types::{AttributeValue, ReturnValue, WriteRequest},
 };
 use lambda_commons_utils::{log, tokio};
@@ -10,7 +10,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::dynamodb;
 
 pub(super) static PK: &'static str = "PK";
-pub(super) static SK: &'static str = "SK";
 pub(super) static TYPE: &'static str = "_TYPE";
 
 pub(super) type DynamoItem = HashMap<String, aws_sdk_dynamodb::types::AttributeValue>;
@@ -108,7 +107,7 @@ pub(super) async fn dynamodb_batch_write(
 
 pub(super) async fn dynamodb_delete_item(
     key: DynamoItem,
-) -> Result<DynamoItem, aws_sdk_dynamodb::Error> {
+) -> Result<Option<DynamoItem>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_delete_item - key={key:?}");
     Ok(dynamodb()
         .delete_item()
@@ -118,25 +117,19 @@ pub(super) async fn dynamodb_delete_item(
         .return_values(ReturnValue::AllOld)
         .send()
         .await
-        .map(|delete_output| delete_output.attributes.expect("asked for them"))?)
+        .map(|delete_output| delete_output.attributes)?)
 }
 
-macro_rules! dynamodb_perform {
-    ($fnname:ident, $t:ty) => {
-        pub(super) async fn $fnname(
-            builder: $t,
-        ) -> Result<Vec<DynamoItem>, aws_sdk_dynamodb::Error> {
-            let res = builder.clone().send().await?;
-            let mut items = res.items.unwrap_or_default();
-            let mut lek = res.last_evaluated_key;
-            while lek.is_some() {
-                let res = builder.clone().set_exclusive_start_key(lek).send().await?;
-                lek = res.last_evaluated_key;
-                items.extend(res.items.unwrap_or_default());
-            }
-            Ok(items)
-        }
-    };
+pub(super) async fn dynamodb_perform_scan(
+    builder: ScanFluentBuilder,
+) -> Result<Vec<DynamoItem>, aws_sdk_dynamodb::Error> {
+    let res = builder.clone().send().await?;
+    let mut items = res.items.unwrap_or_default();
+    let mut lek = res.last_evaluated_key;
+    while lek.is_some() {
+        let res = builder.clone().set_exclusive_start_key(lek).send().await?;
+        lek = res.last_evaluated_key;
+        items.extend(res.items.unwrap_or_default());
+    }
+    Ok(items)
 }
-dynamodb_perform!(dynamodb_perform_scan, ScanFluentBuilder);
-dynamodb_perform!(dynamodb_perform_query, QueryFluentBuilder);

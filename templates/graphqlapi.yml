@@ -114,7 +114,7 @@ Resources:
   BackendTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub ${ProjectName}-backend
+      TableName: !Sub ${ProjectName}-backend-tmp
       BillingMode: PAY_PER_REQUEST
       SSESpecification:
         SSEEnabled: true
@@ -122,13 +122,9 @@ Resources:
       AttributeDefinitions:
         - AttributeName: PK
           AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: True
 

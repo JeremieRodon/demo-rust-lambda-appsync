@@ -1,16 +1,25 @@
 use std::collections::HashSet;
 
+use lambda_commons_utils::tokio;
 use shared_types::common::Uuid;
 
 use crate::{
     appsync_utils::AppSyncError,
     dynamodb_utils::{
-        dynamodb_delete_player, dynamodb_get_player, dynamodb_player_click,
-        dynamodb_put_new_player, dynamodb_query_game_state, dynamodb_query_teams_player_count,
-        dynamodb_reset_game, dynamodb_update_player_latency_stats, dynamodb_update_player_name,
+        dynamodb_delete_player, dynamodb_get_game_status, dynamodb_get_player,
+        dynamodb_player_click, dynamodb_put_new_player, dynamodb_query_game_state,
+        dynamodb_query_teams_player_count, dynamodb_reset_game,
+        dynamodb_update_player_latency_stats, dynamodb_update_player_name,
     },
     GameState, GameStatus, LatencyReport, Player, Team,
 };
+
+fn player_not_found() -> AppSyncError {
+    AppSyncError::new("PlayerNotFound", "Player does not exist")
+}
+fn invalid_game_status() -> AppSyncError {
+    AppSyncError::new("InvalidGameStatus", "Game is not started")
+}
 
 impl crate::Operation {
     pub async fn query_game_state() -> Result<GameState, AppSyncError> {
@@ -121,7 +130,9 @@ impl crate::Operation {
             )
             .await;
         }
-        Ok(dynamodb_delete_player(player_id).await?)
+        Ok(dynamodb_delete_player(player_id)
+            .await?
+            .ok_or_else(player_not_found)?)
     }
 }
 
@@ -132,6 +143,13 @@ impl crate::Operation {
         if false {
             return <crate::Operation as crate::DefautOperations>::mutation_click_rust(player_id)
                 .await;
+        }
+
+        let game_status = dynamodb_get_game_status()
+            .await?
+            .ok_or_else(invalid_game_status)?;
+        if game_status != GameStatus::Started {
+            return Err(invalid_game_status());
         }
         Ok(dynamodb_player_click(player_id).await?)
     }
@@ -150,10 +168,15 @@ impl crate::Operation {
             )
             .await;
         }
-        // Retrieve the current player
-        let mut player = dynamodb_get_player(player_id)
+        let player_req = tokio::spawn(dynamodb_get_player(player_id));
+        let game_status = dynamodb_get_game_status()
             .await?
-            .ok_or_else(|| AppSyncError::new("PlayerNotFound", "Player does not exist"))?;
+            .ok_or_else(invalid_game_status)?;
+        if game_status != GameStatus::Started {
+            return Err(invalid_game_status());
+        }
+        // Retrieve the current player
+        let player = player_req.await.unwrap()?.ok_or_else(player_not_found)?;
         let LatencyReport {
             clicks,
             avg_latency,
@@ -175,18 +198,16 @@ impl crate::Operation {
 
         let new_avg_latency = new_total_latency / (new_avg_latency_clicks as f64);
         if new_avg_latency.is_finite() {
-            dynamodb_update_player_latency_stats(
+            Ok(dynamodb_update_player_latency_stats(
                 player_id,
                 old_avg_latency,
                 old_avg_latency_clicks,
                 new_avg_latency,
                 new_avg_latency_clicks,
             )
-            .await?;
-
-            player.avg_latency = Some(new_avg_latency);
-            player.avg_latency_clicks = Some(new_avg_latency_clicks);
+            .await?)
+        } else {
+            Ok(player)
         }
-        Ok(player)
     }
 }

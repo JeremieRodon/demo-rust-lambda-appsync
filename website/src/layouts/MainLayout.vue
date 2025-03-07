@@ -35,12 +35,15 @@ function reset_game() {
 
 const registered_player_id = inject('registered_player_id');
 watch(players, () => {
+  control_player_id();
+});
+function control_player_id() {
   if (registered_player_id.value && !players.has(registered_player_id.value)) {
     // If we have an ID but it is not in the game state,
     // better forget it...
     registered_player_id.value = null;
   }
-});
+}
 const current_player = computed(() => {
   return players.get(registered_player_id.value);
 });
@@ -149,6 +152,7 @@ async function load_game_state() {
     gs.players.forEach((p) => {
       update_player(p);
     });
+    control_player_id();
   } catch (e) {
     alert_appsync_error(e, 'Could not retrieve the Game state 😭');
   }
