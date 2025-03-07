@@ -1,24 +1,20 @@
 <script setup>
 import { alert_appsync_error, alert_success } from '@/modules/utils';
-import { generateClient } from 'aws-amplify/api';
 import { signOut } from 'aws-amplify/auth';
 import { computed, inject, ref } from 'vue';
 
+const client = inject('appsync_admin_client');
+
 const signed_user = inject('signed_user');
+const signed_user_is_admin = inject('signed_user_is_admin');
 const email = computed(() => {
   if (signed_user.value) {
     return signed_user.value.email;
   }
   return '';
 });
-const is_admin = computed(() => {
-  return signed_user.value != null && signed_user.value.is_admin;
-});
 const in_operation = ref(null);
 const game_status = inject('game_status');
-const client = generateClient({
-  authMode: 'userPool',
-});
 
 async function alter_game_state(mutation_name) {
   in_operation.value = true;
@@ -26,7 +22,7 @@ async function alter_game_state(mutation_name) {
     const new_status = (
       await client.graphql({
         query: `
-        mutation alterGameState {
+        mutation AlterGameState {
           ${mutation_name}
         }
       `,
@@ -57,7 +53,10 @@ async function reset_game() {
     <div class="text-lg flex flex-col items-center m-4">
       <div class="font-bold">{{ email }}</div>
       <div class="font-black">
-        Admin: <span :class="is_admin ? 'text-success' : 'text-error'">{{ is_admin }}</span>
+        Admin:
+        <span :class="signed_user_is_admin ? 'text-success' : 'text-error'">{{
+          signed_user_is_admin
+        }}</span>
       </div>
     </div>
     <div class="flex flex-row gap-4">

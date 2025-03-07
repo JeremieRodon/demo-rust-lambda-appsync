@@ -19,9 +19,6 @@ const is_current_player_team = computed(() => {
 const team_name = computed(() => {
   return props.team.team_name;
 });
-const team_player_count = computed(() => {
-  return props.team.players.length;
-});
 const team_display_name = computed(() => {
   return team_to_displayname(team_name.value);
 });
@@ -52,7 +49,7 @@ const team_avg_latency_rounded = computed(() => {
             />
           </svg>
           <div class="flex flex-col">
-            <div class="text-2xl font-black">{{ team_player_count }}</div>
+            <div class="text-2xl font-black">{{ team.players_count }}</div>
             <div class="text-base-content/60 text-xs font-light">Players</div>
           </div>
         </div>

@@ -13,8 +13,8 @@ const client = inject('appsync_client');
 
 const change_name_modal_open = ref(false);
 
-watch(game_status, () => {
-  if (game_status.value == 'STARTED') {
+watch([game_status, current_player], () => {
+  if (current_player.value && game_status.value == 'STARTED') {
     begin_reporting();
   } else {
     stop_reporting();
@@ -77,7 +77,7 @@ async function call_click() {
   try {
     await client.graphql({
       query: `
-        mutation click($player_id: ID!) {
+        mutation Click($player_id: ID!) {
           ${click_mutation}(player_id: $player_id) {
               id
               name
@@ -145,7 +145,7 @@ async function report_latency() {
   try {
     await client.graphql({
       query: `
-        mutation reportLatency($player_id: ID!, $report: LatencyReport!) {
+        mutation ReportLatency($player_id: ID!, $report: LatencyReport!) {
           ${report_latency_mutation}(player_id: $player_id, report: $report) {
               id
               name
@@ -164,7 +164,7 @@ async function report_latency() {
 }
 onMounted(() => {
   console.log('onMounted BEGIN');
-  if (game_status.value == 'STARTED') {
+  if (current_player.value && game_status.value == 'STARTED') {
     begin_reporting();
   }
   console.log('onMounted END');
@@ -185,7 +185,7 @@ onUnmounted(() => {
           <div class="text-xl font-black text-wrap [word-break:break-word]">
             {{ current_player_name }}
           </div>
-          <div class="text-sm font-light max-w-20 text-nowrap overflow-visible">
+          <div class="text-sm font-light text-nowrap overflow-visible">
             {{ current_player_team_name }}
           </div>
         </div>

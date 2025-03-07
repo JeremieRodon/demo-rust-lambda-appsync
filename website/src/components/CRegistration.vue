@@ -5,12 +5,9 @@ import { alert_appsync_error, alert_success } from '@/modules/utils';
 import { computed, inject, ref } from 'vue';
 
 const registered_player_id = inject('registered_player_id');
-const signed_user = inject('signed_user');
-const is_admin = computed(() => {
-  return signed_user.value != null && signed_user.value.is_admin;
-});
+const signed_user_is_admin = inject('signed_user_is_admin');
 const need_registration = computed(() => {
-  return registered_player_id.value == null && !is_admin.value;
+  return registered_player_id.value == null && !signed_user_is_admin.value;
 });
 
 const player_name = ref(null);
@@ -30,7 +27,7 @@ async function handle_register() {
     const player_id = (
       await client.graphql({
         query: `
-        mutation registerNewPlayer($name: String!) {
+        mutation RegisterNewPlayer($name: String!) {
             registerNewPlayer(name: $name) {
               id
               name
@@ -58,7 +55,7 @@ async function handle_register() {
     <div class="card bg-base-100 w-fit mx-auto">
       <div class="card-title text-4xl font-bold justify-center">Registration</div>
       <div class="card-body w-fit">
-        <p class="text-base">You must choose a pseudonym before playing.</p>
+        <p class="text-base">You must choose a name before playing.</p>
         <simple-input
           v-model="player_name"
           v-model:error="player_name_error"

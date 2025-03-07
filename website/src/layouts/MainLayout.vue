@@ -2,12 +2,10 @@
 import { RouterView } from 'vue-router';
 import ThemeSwitch from '@/components/ThemeSwitch.vue';
 import LayoutLinks from '@/components/LayoutLinks.vue';
-import { computed, inject, onMounted, onUnmounted, provide, reactive, ref } from 'vue';
-import { generateClient } from 'aws-amplify/api';
+import { computed, inject, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue';
 import { alert_appsync_error, alert_error } from '@/modules/utils';
 
-const client = generateClient();
-provide('appsync_client', client);
+const client = inject('appsync_client');
 
 const game_status = ref(null);
 provide('game_status', game_status);
@@ -36,6 +34,13 @@ function reset_game() {
 }
 
 const registered_player_id = inject('registered_player_id');
+watch(players, () => {
+  if (registered_player_id.value && !players.has(registered_player_id.value)) {
+    // If we have an ID but it is not in the game state,
+    // better forget it...
+    registered_player_id.value = null;
+  }
+});
 const current_player = computed(() => {
   return players.get(registered_player_id.value);
 });
@@ -74,16 +79,14 @@ function count_player(team, player) {
     team.avg_latency_clicks = avg_latency_clicks;
   }
 }
-
 function remove_player(player_id) {
   const player = players.get(player_id);
   if (players.delete(player_id)) {
     const team = teams.get(player.team);
     uncount_player(team, player);
-    team.players.delete(player_id);
+    team.players_count -= 1;
   }
 }
-
 function update_player(player) {
   const team_name = player.team;
 
@@ -94,7 +97,7 @@ function update_player(player) {
   if (team == null) {
     teams.set(team_name, {
       team_name,
-      players: [],
+      players_count: 0,
       total_clicks: 0,
       avg_latency: NaN,
       avg_latency_clicks: 0,
@@ -110,7 +113,7 @@ function update_player(player) {
   } else {
     // If the player was not present, it is the first time we saw them
     // So add them to the team list
-    team.players.push(player.id);
+    team.players_count += 1;
   }
 
   // Then count them in
@@ -143,19 +146,9 @@ async function load_game_state() {
     ).data.gameState;
     console.log(gs);
     update_game_status(gs.status);
-    let i_saw_me = false;
-    let my_id = registered_player_id.value;
     gs.players.forEach((p) => {
       update_player(p);
-      if (p.id == my_id) {
-        i_saw_me = true;
-      }
     });
-    // If we have an ID but it is not in the game state,
-    // better forget it...
-    if (my_id && !i_saw_me) {
-      registered_player_id.value = null;
-    }
   } catch (e) {
     alert_appsync_error(e, 'Could not retrieve the Game state 😭');
   }
@@ -205,6 +198,11 @@ function subscribe_updates() {
         subscription RemovedPlayer {
           removedPlayer {
             id
+            name
+            team
+            clicks
+            avg_latency
+            avg_latency_clicks
           }
         }
       `,

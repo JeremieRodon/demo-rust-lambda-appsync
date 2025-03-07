@@ -151,7 +151,9 @@ impl crate::Operation {
             .await;
         }
         // Retrieve the current player
-        let mut player = dynamodb_get_player(player_id).await?;
+        let mut player = dynamodb_get_player(player_id)
+            .await?
+            .ok_or_else(|| AppSyncError::new("PlayerNotFound", "Player does not exist"))?;
         let LatencyReport {
             clicks,
             avg_latency,

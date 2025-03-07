@@ -55,7 +55,6 @@ export function alert_info(message, timeout = 5000) {
 export function alert_appsync_error(appsync_error_response, message, timeout = 5000) {
   console.error(appsync_error_response);
   for (const error of appsync_error_response.errors) {
-    console.log(error);
     let error_type;
     if (error.errorType) {
       if (error.errorType.startsWith('Lambda:')) {

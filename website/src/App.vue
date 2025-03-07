@@ -1,13 +1,25 @@
 <script setup>
 import { Hub } from 'aws-amplify/utils';
-import { onMounted, provide, ref, watch } from 'vue';
+import { computed, onMounted, provide, ref, watch } from 'vue';
 import { RouterView } from 'vue-router';
 import router from '@/router';
 import { getUserInfos } from './modules/utils';
 import AlertDisplay from './components/AlertDisplay.vue';
+import { generateClient } from 'aws-amplify/api';
+
+const client = generateClient();
+provide('appsync_client', client);
+const admin_client = generateClient({
+  authMode: 'userPool',
+});
+provide('appsync_admin_client', admin_client);
 
 const signed_user = ref(null);
 provide('signed_user', signed_user);
+const signed_user_is_admin = computed(() => {
+  return signed_user.value != null && signed_user.value.is_admin;
+});
+provide('signed_user_is_admin', signed_user_is_admin);
 
 const registered_player_id = ref(null);
 provide('registered_player_id', registered_player_id);

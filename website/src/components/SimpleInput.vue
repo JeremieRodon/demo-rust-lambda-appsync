@@ -5,6 +5,7 @@ const model = defineModel();
 const error_model = defineModel('error');
 const props = defineProps({
   id: { type: String, default: null },
+  name: { type: String, default: null },
   disabled: { type: Boolean, default: false },
   class: { type: String, default: null },
   rules: {
@@ -96,19 +97,20 @@ function immediate_feedback() {
 
 <template>
   <div class="flex flex-col" :class="props.class">
-    <label class="label" :for="id">
-      <span class="label-text font-bold"> <slot></slot></span>
+    <label class="label flex-col items-start">
+      <div class="label-text font-bold"><slot></slot></div>
+      <input
+        v-model.trim="local_value_copy"
+        :id="id"
+        :name="name"
+        class="input input-bordered placeholder:text-base-content/20"
+        :class="show_error.show ? ['input-error'] : []"
+        v-bind="$attrs"
+        :disabled="read_only || disabled"
+        @keydown.enter="immediate_feedback"
+        @focusout="immediate_feedback"
+      />
     </label>
-    <input
-      v-model.trim="local_value_copy"
-      :id="id"
-      class="input input-bordered placeholder:text-base-content/20"
-      :class="show_error.show ? ['input-error'] : []"
-      v-bind="$attrs"
-      :disabled="read_only || disabled"
-      @keydown.enter="immediate_feedback"
-      @focusout="immediate_feedback"
-    />
     <div
       class="w-full pt-px text-xs font-normal text-error text-center max-h-4"
       :class="!show_error.show ? 'invisible' : null"

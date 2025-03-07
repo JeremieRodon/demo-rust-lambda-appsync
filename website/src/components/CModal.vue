@@ -5,7 +5,7 @@ const open = defineModel();
 <template>
   <Teleport to="body">
     <!-- Put this part before </body> tag -->
-    <input type="checkbox" class="modal-toggle" v-model="open" />
+    <input type="checkbox" name="modal-toggle" class="modal-toggle" v-model="open" />
     <div class="modal z-40" role="dialog">
       <div class="modal-box">
         <slot></slot>

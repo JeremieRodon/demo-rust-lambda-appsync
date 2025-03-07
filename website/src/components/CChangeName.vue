@@ -57,10 +57,10 @@ async function change_name() {
       `,
       variables,
     });
-
-    alert_success(`Pseudo successfuly changed`);
+    open.value = false;
+    alert_success(`Player name successfuly changed`);
   } catch (e) {
-    alert_appsync_error(e, 'Could not change your pseudo 😭');
+    alert_appsync_error(e, 'Could not change your name 😭');
   } finally {
     in_operation.value = false;
   }
@@ -70,9 +70,9 @@ async function change_name() {
 <template>
   <c-modal v-model="open">
     <div class="card bg-base-100 w-fit mx-auto">
-      <div class="card-title text-4xl font-bold justify-center">Registration</div>
+      <div class="card-title text-4xl font-bold justify-center">Change name</div>
       <div class="card-body w-fit">
-        <p class="text-base">You must choose a pseudonym before playing.</p>
+        <p class="text-base">You can change your player name here if you wish.</p>
         <simple-input
           v-model="player_name"
           v-model:error="player_name_error"
