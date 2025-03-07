@@ -52,6 +52,25 @@ export function alert_info(message, timeout = 5000) {
   alert('Info', 'alert-info', message, timeout);
 }
 
+export function alert_appsync_error(appsync_error_response, message, timeout = 5000) {
+  console.error(appsync_error_response);
+  for (const error of appsync_error_response.errors) {
+    console.log(error);
+    let error_type;
+    if (error.errorType) {
+      if (error.errorType.startsWith('Lambda:')) {
+        error_type = `[${error.errorType.substring(7)}]`;
+      } else {
+        error_type = `[${error.errorType}]`;
+      }
+    } else {
+      error_type = '';
+    }
+    const error_message = error.message;
+    alert_error(`${message} (${error_type}${error_message})`, timeout);
+  }
+}
+
 export function team_to_displayname(team) {
   if (team == 'RUST') {
     return 'Team Rust';

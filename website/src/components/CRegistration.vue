@@ -1,7 +1,7 @@
 <script setup>
 import CModal from '@/components/CModal.vue';
 import SimpleInput from '@/components/SimpleInput.vue';
-import { alert_error, alert_success } from '@/modules/utils';
+import { alert_appsync_error, alert_success } from '@/modules/utils';
 import { computed, inject, ref } from 'vue';
 
 const registered_player_id = inject('registered_player_id');
@@ -46,8 +46,7 @@ async function handle_register() {
 
     alert_success(`Welcome ${name}! 🎉`);
   } catch (e) {
-    console.error(e);
-    alert_error('Could not register you 😭');
+    alert_appsync_error(e, 'Could not register you 😭');
   } finally {
     in_operation.value = false;
   }
@@ -64,7 +63,7 @@ async function handle_register() {
           v-model="player_name"
           v-model:error="player_name_error"
           tabindex="1"
-          id="pseudonym"
+          name="pseudo"
           placeholder="The GOAT 🐐"
           autocomplete="off"
           :rules="[
@@ -79,17 +78,15 @@ async function handle_register() {
         >
           Player Name
         </simple-input>
-        <div class="flex flex-col mt-2 gap-2">
-          <button
-            class="btn btn-primary"
-            :disabled="in_operation || player_name_error"
-            tabindex="2"
-            @click="handle_register()"
-          >
-            <span v-show="in_operation" class="loading loading-spinner loading-md"></span>
-            Register
-          </button>
-        </div>
+        <button
+          class="btn btn-primary mt-2"
+          :disabled="in_operation || player_name_error"
+          tabindex="2"
+          @click="handle_register()"
+        >
+          <span v-show="in_operation" class="loading loading-spinner loading-md"></span>
+          Register
+        </button>
       </div>
     </div>
   </c-modal>

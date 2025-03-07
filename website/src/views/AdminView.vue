@@ -1,5 +1,5 @@
 <script setup>
-import { alert_error, alert_success } from '@/modules/utils';
+import { alert_appsync_error, alert_success } from '@/modules/utils';
 import { generateClient } from 'aws-amplify/api';
 import { signOut } from 'aws-amplify/auth';
 import { computed, inject, ref } from 'vue';
@@ -35,8 +35,7 @@ async function alter_game_state(mutation_name) {
 
     alert_success(`New game state: ${new_status}`);
   } catch (e) {
-    console.error(e);
-    alert_error(`Could not perform ${mutation_name} on the game 😭`);
+    alert_appsync_error(e, `Could not perform ${mutation_name} on the game 😭`);
   } finally {
     in_operation.value = false;
   }

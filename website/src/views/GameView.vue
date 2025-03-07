@@ -1,14 +1,17 @@
 <script setup>
+import CChangeName from '@/components/CChangeName.vue';
 import CRegistration from '@/components/CRegistration.vue';
 import TeamIcon from '@/components/TeamIcon.vue';
 import TeamScore from '@/components/TeamScore.vue';
-import { alert_error, team_to_displayname } from '@/modules/utils';
+import { alert_appsync_error, team_to_displayname } from '@/modules/utils';
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 
 const current_player = inject('current_player');
 const teams = inject('teams');
 const game_status = inject('game_status');
 const client = inject('appsync_client');
+
+const change_name_modal_open = ref(false);
 
 watch(game_status, () => {
   if (game_status.value == 'STARTED') {
@@ -88,8 +91,7 @@ async function call_click() {
       variables,
     });
   } catch (e) {
-    console.error(e);
-    alert_error('Could not click 😭');
+    alert_appsync_error(e, 'Could not click 😭');
   } finally {
     const duration = Date.now() - start;
     latency_report_buffer.push(duration);
@@ -157,8 +159,7 @@ async function report_latency() {
       variables,
     });
   } catch (e) {
-    console.error(e);
-    alert_error('Could not report 😭');
+    alert_appsync_error(e, 'Could not report 😭');
   }
 }
 onMounted(() => {
@@ -178,14 +179,23 @@ onUnmounted(() => {
 <template>
   <main>
     <div class="px-2 md:px-4 mx-auto max-w-screen-lg">
-      <div class="flex flex-row justify-center items-center m-4">
-        <div class="flex flex-col items-center min-w-20 w-20">
+      <div class="flex flex-row justify-center items-center m-4 gap-2">
+        <team-icon :name="current_player_team" class="h-16"></team-icon>
+        <div class="flex flex-col items-start">
+          <div class="text-xl font-black text-wrap [word-break:break-word]">
+            {{ current_player_name }}
+          </div>
           <div class="text-sm font-light max-w-20 text-nowrap overflow-visible">
             {{ current_player_team_name }}
           </div>
-          <team-icon :name="current_player_team" class="h-16"></team-icon>
         </div>
-        <div class="text-xl font-black text-wrap break-all">{{ current_player_name }}</div>
+        <button class="btn btn-circle btn-ghost" @click="change_name_modal_open = true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 fill-primary" viewBox="0 0 24 24">
+            <path
+              d="M19.71,8.04L17.37,10.37L13.62,6.62L15.96,4.29C16.35,3.9 17,3.9 17.37,4.29L19.71,6.63C20.1,7 20.1,7.65 19.71,8.04M3,17.25L13.06,7.18L16.81,10.93L6.75,21H3V17.25M16.62,5.04L15.08,6.58L17.42,8.92L18.96,7.38L16.62,5.04M15.36,11L13,8.64L4,17.66V20H6.34L15.36,11Z"
+            />
+          </svg>
+        </button>
       </div>
       <div class="max-w-4xl mx-auto">
         <template v-for="team in sorted_teams" :key="team.team_name">
@@ -208,5 +218,6 @@ onUnmounted(() => {
       </div>
     </div>
     <c-registration></c-registration>
+    <c-change-name v-model="change_name_modal_open"></c-change-name>
   </main>
 </template>

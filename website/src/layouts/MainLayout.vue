@@ -4,7 +4,7 @@ import ThemeSwitch from '@/components/ThemeSwitch.vue';
 import LayoutLinks from '@/components/LayoutLinks.vue';
 import { computed, inject, onMounted, onUnmounted, provide, reactive, ref } from 'vue';
 import { generateClient } from 'aws-amplify/api';
-import { alert_error } from '@/modules/utils';
+import { alert_appsync_error, alert_error } from '@/modules/utils';
 
 const client = generateClient();
 provide('appsync_client', client);
@@ -157,8 +157,7 @@ async function load_game_state() {
       registered_player_id.value = null;
     }
   } catch (e) {
-    console.error(e);
-    alert_error('Could not retrieve the Game state 😭');
+    alert_appsync_error(e, 'Could not retrieve the Game state 😭');
   }
 
   try {

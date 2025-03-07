@@ -15,7 +15,7 @@ type Mutation {
   stopGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
   resetGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
   registerNewPlayer(name: String!): Player! @aws_api_key
-  updatePlayerName(new_name: String!): Player! @aws_api_key
+  updatePlayerName(player_id: ID!, new_name: String!): Player! @aws_api_key
   removePlayer(player_id: ID!): Player!
     @aws_cognito_user_pools(cognito_groups: ["Admins"])
   clickRust(player_id: ID!): Player! @aws_api_key
