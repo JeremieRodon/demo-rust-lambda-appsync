@@ -114,7 +114,7 @@ Resources:
   BackendTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub ${ProjectName}-backend-tmp
+      TableName: !Sub ${ProjectName}-backend
       BillingMode: PAY_PER_REQUEST
       SSESpecification:
         SSEEnabled: true
