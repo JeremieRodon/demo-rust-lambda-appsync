@@ -14,6 +14,13 @@ fn player_not_found() -> AppSyncError {
 fn invalid_game_status() -> AppSyncError {
     AppSyncError::new("InvalidGameStatus", "Game is not started")
 }
+fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
+    let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(&e);
+    AppSyncError {
+        error_type: meta.code().unwrap_or("Unknown").to_owned(),
+        error_message: meta.message().unwrap_or_default().to_owned(),
+    }
+}
 
 impl crate::Operation {
     pub async fn mutation_click_rust(player_id: ID) -> Result<Player, AppSyncError> {
@@ -25,12 +32,15 @@ impl crate::Operation {
         }
 
         let game_status = dynamodb_get_game_status()
-            .await?
+            .await
+            .map_err(from_dynamo_error)?
             .ok_or_else(invalid_game_status)?;
         if game_status != GameStatus::Started {
             return Err(invalid_game_status());
         }
-        Ok(dynamodb_update_player_click(player_id).await?)
+        Ok(dynamodb_update_player_click(player_id)
+            .await
+            .map_err(from_dynamo_error)?)
     }
 }
 
@@ -49,13 +59,18 @@ impl crate::Operation {
         }
         let player_req = tokio::spawn(dynamodb_get_player(player_id));
         let game_status = dynamodb_get_game_status()
-            .await?
+            .await
+            .map_err(from_dynamo_error)?
             .ok_or_else(invalid_game_status)?;
         if game_status != GameStatus::Started {
             return Err(invalid_game_status());
         }
         // Retrieve the current player
-        let player = player_req.await.unwrap()?.ok_or_else(player_not_found)?;
+        let player = player_req
+            .await
+            .unwrap()
+            .map_err(from_dynamo_error)?
+            .ok_or_else(player_not_found)?;
         let LatencyReport {
             clicks,
             avg_latency,
@@ -84,7 +99,8 @@ impl crate::Operation {
                 new_avg_latency,
                 new_avg_latency_clicks,
             )
-            .await?)
+            .await
+            .map_err(from_dynamo_error)?)
         } else {
             Ok(player)
         }

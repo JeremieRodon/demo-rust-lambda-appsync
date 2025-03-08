@@ -9,9 +9,6 @@ authors.workspace = true
 
 [dependencies]
 tokio = { workspace = true}
-# TODO: This is just to impl From<DynamoDbError> for AppsyncError
-# We should try to impl From<SdkError> instead.
-aws-sdk-dynamodb = { workspace = true }
 
 log = { workspace = true }
 thiserror = { workspace = true }

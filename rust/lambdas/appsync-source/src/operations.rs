@@ -13,6 +13,13 @@ use appsync_utils::{AppSyncError, ID};
 fn player_not_found() -> AppSyncError {
     AppSyncError::new("PlayerNotFound", "Player does not exist")
 }
+fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
+    let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(&e);
+    AppSyncError {
+        error_type: meta.code().unwrap_or("Unknown").to_owned(),
+        error_message: meta.message().unwrap_or_default().to_owned(),
+    }
+}
 
 impl crate::Operation {
     pub async fn query_game_state() -> Result<GameState, AppSyncError> {
@@ -21,7 +28,9 @@ impl crate::Operation {
         if false {
             return <crate::Operation as crate::DefautOperations>::query_game_state().await;
         }
-        Ok(dynamodb_query_game_state().await?)
+        Ok(dynamodb_query_game_state()
+            .await
+            .map_err(from_dynamo_error)?)
     }
 }
 
@@ -34,7 +43,9 @@ macro_rules! game_status_mut {
                 if false {
                     return <crate::Operation as crate::DefautOperations>::$mut_name().await;
                 }
-                dynamodb_set_game_status($status).await?;
+                dynamodb_set_game_status($status)
+                    .await
+                    .map_err(from_dynamo_error)?;
                 Ok($status)
             }
         }
@@ -51,7 +62,7 @@ impl crate::Operation {
         if false {
             return <crate::Operation as crate::DefautOperations>::mutation_reset_game().await;
         }
-        dynamodb_reset_game().await?;
+        dynamodb_reset_game().await.map_err(from_dynamo_error)?;
         Ok(GameStatus::Reset)
     }
 }
@@ -66,7 +77,9 @@ impl crate::Operation {
             )
             .await;
         }
-        let mut teams_player_count = dynamodb_query_teams_player_count().await?;
+        let mut teams_player_count = dynamodb_query_teams_player_count()
+            .await
+            .map_err(from_dynamo_error)?;
         let team = if teams_player_count.len() < Team::TEAM_COUNT {
             // If all teams are not yet used, choose one of the unused
             let mut all_teams = HashSet::from(Team::all());
@@ -91,7 +104,9 @@ impl crate::Operation {
             avg_latency: None,
             avg_latency_clicks: None,
         };
-        dynamodb_put_new_player(&new_player).await?;
+        dynamodb_put_new_player(&new_player)
+            .await
+            .map_err(from_dynamo_error)?;
         Ok(new_player)
     }
 }
@@ -109,7 +124,9 @@ impl crate::Operation {
             )
             .await;
         }
-        Ok(dynamodb_update_player_name(player_id, new_name).await?)
+        Ok(dynamodb_update_player_name(player_id, new_name)
+            .await
+            .map_err(from_dynamo_error)?)
     }
 }
 
@@ -124,7 +141,8 @@ impl crate::Operation {
             .await;
         }
         Ok(dynamodb_delete_player(player_id)
-            .await?
+            .await
+            .map_err(from_dynamo_error)?
             .ok_or_else(player_not_found)?)
     }
 }

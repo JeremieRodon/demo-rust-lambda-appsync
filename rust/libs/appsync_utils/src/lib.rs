@@ -88,16 +88,6 @@ impl BitOr for AppSyncError {
     }
 }
 
-impl From<aws_sdk_dynamodb::Error> for AppSyncError {
-    fn from(e: aws_sdk_dynamodb::Error) -> Self {
-        let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(&e);
-        AppSyncError {
-            error_type: meta.code().unwrap_or("Unknown").to_owned(),
-            error_message: meta.message().unwrap_or_default().to_owned(),
-        }
-    }
-}
-
 pub fn arg_from_json<T: DeserializeOwned>(
     args: &mut serde_json::Value,
     arg_name: &'static str,

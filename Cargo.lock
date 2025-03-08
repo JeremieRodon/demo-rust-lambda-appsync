@@ -105,7 +105,6 @@ dependencies = [
 name = "appsync_utils"
 version = "0.1.0"
 dependencies = [
- "aws-sdk-dynamodb",
  "log",
  "serde",
  "serde_json",

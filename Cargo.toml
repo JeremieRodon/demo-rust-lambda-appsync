@@ -15,6 +15,7 @@ lambda_runtime = "0.12"
 lambda_http = "0.12"
 aws-config = { version = "1.5", features = ["behavior-version-latest"] }
 aws-sdk-dynamodb = { version = "1.59" }
+aws-smithy-types = { version = "1.2" }
 
 tokio = { version = "1", features = ["macros"] }
 
