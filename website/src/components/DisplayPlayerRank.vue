@@ -1,6 +1,20 @@
 <script setup>
-defineProps({
+import { computed } from 'vue';
+
+const props = defineProps({
   rank: Number,
+});
+
+const color_class = computed(() => {
+  if (props.rank == 1) {
+    return 'text-yellow-300';
+  } else if (props.rank == 2) {
+    return 'text-gray-500';
+  } else if (props.rank == 3) {
+    return 'text-orange-800';
+  } else {
+    return '';
+  }
 });
 </script>
 
@@ -9,7 +23,7 @@ defineProps({
     class="grid grid-cols-1 grid-rows-2 sm:grid-cols-2 sm:grid-rows-1 justify-start items-center sm:px-2 self-stretch"
   >
     <div class="text-base-content/60 font-bold text-center text-sm">Rank</div>
-    <div class="flex flex-row items-center sm:justify-center">
+    <div class="flex flex-row items-center sm:justify-center" :class="color_class">
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
