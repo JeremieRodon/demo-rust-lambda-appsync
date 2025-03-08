@@ -65,6 +65,91 @@ Resources:
               FieldName: !Ref Op
               MaxBatchSize: 100
               MetricsConfig: ENABLED
+  ################################
+  # JS AppSync GraphQL Resolvers #
+  ################################
+  JsGetGameStatusFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsGetGameStatus
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      CodeS3Location: ../graphql/js/get_game_status.req.js
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+      MaxBatchSize: 100
+  JsGetPlayerFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsGetPlayer
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      CodeS3Location: ../graphql/js/get_player.req.js
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+      MaxBatchSize: 100
+  JsUpdateClickFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsUpdateClick
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      CodeS3Location: ../graphql/js/update_click.req.js
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+      MaxBatchSize: 100
+  JsUpdateLatencyFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsUpdateLatency
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      CodeS3Location: ../graphql/js/update_latency.req.js
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+      MaxBatchSize: 100
+
+  JsMutationclickJsResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Kind: PIPELINE
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      CodeS3Location: ../graphql/js/pipeline.js
+      TypeName: Mutation
+      FieldName: clickJs
+      MaxBatchSize: 100
+      MetricsConfig: ENABLED
+      PipelineConfig:
+        Functions:
+          - !GetAtt JsGetGameStatusFunction.Name
+          - !GetAtt JsUpdateClickFunction.Name
+  JsMutationreportLatencyJsResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Kind: PIPELINE
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      CodeS3Location: ../graphql/js/pipeline.js
+      TypeName: Mutation
+      FieldName: reportLatencyJs
+      MaxBatchSize: 100
+      MetricsConfig: ENABLED
+      PipelineConfig:
+        Functions:
+          - !GetAtt JsGetGameStatusFunction.Name
+          - !GetAtt JsGetPlayerFunction.Name
+          - !GetAtt JsUpdateLatencyFunction.Name
 
   #################
   # Backend table #

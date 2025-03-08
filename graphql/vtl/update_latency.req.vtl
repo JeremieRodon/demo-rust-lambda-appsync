@@ -1,0 +1,71 @@
+## Below example shows how to look up an item with a Primary Key of "id" from GraphQL arguments
+## The helper $util.dynamodb.toDynamoDBJson automatically converts to a DynamoDB formatted request
+## There is a "context" object with arguments, identity, headers, and parent field information you can access.
+## It also has a shorthand notation avaialable:
+##  - $context or $ctx is the root object
+##  - $ctx.arguments or $ctx.args contains arguments
+##  - $ctx.identity has caller information, such as $ctx.identity.username
+##  - $ctx.request.headers contains headers, such as $context.request.headers.xyz
+##  - $ctx.source is a map of the parent field, for instance $ctx.source.xyz
+## Read more: https://docs.aws.amazon.com/appsync/latest/devguide/resolver-mapping-template-reference.html
+#set( $clicks = $ctx.args.report.clicks )
+#set( $avg_latency = $ctx.args.report.avg_latency )
+## $ctx.prev.result == player
+#set( $old_avg_latency = $ctx.prev.result.avg_latency )
+#set( $old_avg_latency_clicks = $ctx.prev.result.avg_latency_clicks )
+#if($old_avg_latency)
+#set( $has_previous_values = true )
+#else
+#set( $has_previous_values = false )
+#end
+
+#if($has_previous_values)
+#set( $old_total_latency = $old_avg_latency * $old_avg_latency_clicks )
+#else
+#set( $old_total_latency = 0.0 )
+#end
+#set( $new_total_latency = $old_total_latency + $avg_latency * $clicks )
+
+#if($has_previous_values)
+#set( $new_avg_latency_clicks = $old_avg_latency_clicks + $clicks )
+#else
+#set( $new_avg_latency_clicks = $clicks )
+#end
+
+#set( $new_avg_latency = $new_total_latency / $new_avg_latency_clicks )
+
+#if($has_previous_values)
+#set( $condition = {
+    "expression": "attribute_exists(PK) AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks",
+    "expressionNames": { "#avg_latency" : "avg_latency", "#avg_latency_clicks" : "avg_latency_clicks" },
+    "expressionValues": { 
+        ":old_avg_latency" : $util.parseJson($util.dynamodb.toDynamoDBJson($old_avg_latency)),
+        ":old_avg_latency_clicks" :$util.parseJson( $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks))
+    }
+})
+#else
+#set( $condition = {
+    "expression": "attribute_exists(PK) AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)",
+    "expressionNames": { "#avg_latency" : "avg_latency", "#avg_latency_clicks" : "avg_latency_clicks" }
+})
+#end
+
+{
+    "version" : "2017-02-28",
+    "operation" : "UpdateItem",
+    "key" : {
+        "PK": $util.dynamodb.toDynamoDBJson("PLAYER#${ctx.args.player_id}"),
+    },
+    "update" : {
+        "expression" : "SET #avg_latency = :new_avg_latency, #avg_latency_clicks = :new_avg_latency_clicks",
+        "expressionNames" : {
+            "#avg_latency" : "avg_latency",
+            "#avg_latency_clicks" : "avg_latency_clicks"
+        },
+        "expressionValues" : {
+            ":new_avg_latency" : $util.dynamodb.toDynamoDBJson($new_avg_latency),
+            ":new_avg_latency_clicks" : $util.dynamodb.toDynamoDBJson($new_avg_latency_clicks)
+        }
+    },
+    "condition" : $util.toJson($condition)
+}

@@ -27,7 +27,7 @@ const clicks = computed(() => {
 
 const avg_latency = computed(() => {
   if (props.player.avg_latency) {
-    return Math.floor(props.player.avg_latency * 100) / 100;
+    return Math.round(props.player.avg_latency * 100) / 100;
   } else {
     return NaN;
   }

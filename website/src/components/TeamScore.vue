@@ -23,7 +23,7 @@ const team_display_name = computed(() => {
   return team_to_displayname(team_name.value);
 });
 const team_avg_latency_rounded = computed(() => {
-  return Math.floor(props.team.avg_latency * 100) / 100;
+  return Math.round(props.team.avg_latency * 100) / 100;
 });
 </script>
 

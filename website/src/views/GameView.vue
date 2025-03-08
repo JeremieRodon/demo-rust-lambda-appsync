@@ -47,7 +47,17 @@ const current_player_team_name = computed(() => {
 });
 const sorted_teams = computed(() => {
   const sorted_teams = [...teams.values()];
-  sorted_teams.sort((t1, t2) => t1.avg_latency - t2.avg_latency);
+  sorted_teams.sort((t1, t2) => {
+    if (isNaN(t1.avg_latency) && isNaN(t2.avg_latency)) {
+      return 0;
+    } else if (isNaN(t1.avg_latency)) {
+      return 1;
+    } else if (isNaN(t2.avg_latency)) {
+      return -1;
+    } else {
+      return t1.avg_latency - t2.avg_latency;
+    }
+  });
   return sorted_teams;
 });
 
