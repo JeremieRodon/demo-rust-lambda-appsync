@@ -73,37 +73,37 @@ Resources:
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Name: VtlGetGameStatus
+      FunctionVersion: 2018-05-29
       RequestMappingTemplateS3Location: ../graphql/vtl/get_game_status.req.vtl
       ResponseMappingTemplate: $util.toJson($ctx.result)
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   VtlGetPlayerFunction:
     Type: AWS::AppSync::FunctionConfiguration
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Name: VtlGetPlayer
+      FunctionVersion: 2018-05-29
       RequestMappingTemplateS3Location: ../graphql/vtl/get_player.req.vtl
       ResponseMappingTemplate: $util.toJson($ctx.result)
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   VtlUpdateClickFunction:
     Type: AWS::AppSync::FunctionConfiguration
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Name: VtlUpdateClick
+      FunctionVersion: 2018-05-29
       RequestMappingTemplateS3Location: ../graphql/vtl/update_click.req.vtl
       ResponseMappingTemplate: $util.toJson($ctx.result)
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   VtlUpdateLatencyFunction:
     Type: AWS::AppSync::FunctionConfiguration
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Name: VtlUpdateLatency
+      FunctionVersion: 2018-05-29
       RequestMappingTemplateS3Location: ../graphql/vtl/update_latency.req.vtl
       ResponseMappingTemplate: $util.toJson($ctx.result)
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   VtlMutationclickVtlResolver:
     Type: AWS::AppSync::Resolver
     DependsOn: GraphQLApiSchema
@@ -114,7 +114,6 @@ Resources:
       ResponseMappingTemplate: $util.toJson($ctx.result)
       TypeName: Mutation
       FieldName: clickVtl
-      MaxBatchSize: 100
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
@@ -130,7 +129,6 @@ Resources:
       ResponseMappingTemplate: $util.toJson($ctx.result)
       TypeName: Mutation
       FieldName: reportLatencyVtl
-      MaxBatchSize: 100
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
@@ -161,7 +159,6 @@ Resources:
           return ctx.result;
         }
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   JsGetPlayerFunction:
     Type: AWS::AppSync::FunctionConfiguration
     Properties:
@@ -188,7 +185,6 @@ Resources:
           return ctx.result;
         }
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   JsUpdateClickFunction:
     Type: AWS::AppSync::FunctionConfiguration
     Properties:
@@ -226,7 +222,6 @@ Resources:
           return ctx.result;
         }
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   JsUpdateLatencyFunction:
     Type: AWS::AppSync::FunctionConfiguration
     Properties:
@@ -295,7 +290,6 @@ Resources:
           return ctx.result;
         }
       DataSourceName: !GetAtt BackendTableDatasource.Name
-      MaxBatchSize: 100
   JsMutationclickJsResolver:
     Type: AWS::AppSync::Resolver
     DependsOn: GraphQLApiSchema
@@ -314,7 +308,6 @@ Resources:
         }
       TypeName: Mutation
       FieldName: clickJs
-      MaxBatchSize: 100
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
@@ -338,7 +331,6 @@ Resources:
         }
       TypeName: Mutation
       FieldName: reportLatencyJs
-      MaxBatchSize: 100
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
