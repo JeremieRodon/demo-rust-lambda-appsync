@@ -2,7 +2,7 @@
 import CModal from '@/components/CModal.vue';
 import SimpleInput from '@/components/SimpleInput.vue';
 import { alert_appsync_error, alert_success } from '@/modules/utils';
-import { computed, inject, ref, watch } from 'vue';
+import { computed, inject, onMounted, ref, watch } from 'vue';
 
 const registered_player_id = inject('registered_player_id');
 const signed_user_is_admin = inject('signed_user_is_admin');
@@ -10,11 +10,13 @@ const signed_user_is_admin = inject('signed_user_is_admin');
 const pseudo = ref(null);
 
 const need_registration = computed(() => {
-  const need_registration = registered_player_id.value == null && !signed_user_is_admin.value;
-  if (need_registration) {
+  return registered_player_id.value == null && !signed_user_is_admin.value;
+});
+
+watch(need_registration, () => {
+  if (need_registration.value) {
     setTimeout(() => pseudo.value.focus(), 100);
   }
-  return need_registration;
 });
 
 const player_name = ref(null);
@@ -55,6 +57,11 @@ async function handle_register() {
     in_operation.value = false;
   }
 }
+onMounted(() => {
+  if (need_registration.value && pseudo.value) {
+    setTimeout(() => pseudo.value.focus(), 100);
+  }
+});
 </script>
 
 <template>

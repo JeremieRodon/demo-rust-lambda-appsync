@@ -4,17 +4,15 @@ use aws_sdk_dynamodb::{
     operation::scan::builders::ScanFluentBuilder,
     types::{AttributeValue, ReturnValue, WriteRequest},
 };
-use lambda_commons_utils::{log, tokio};
-use serde::{de::DeserializeOwned, Serialize};
 
-use crate::dynamodb;
+use serde::{Serialize, de::DeserializeOwned};
 
-pub(super) static PK: &'static str = "PK";
-pub(super) static TYPE: &'static str = "_TYPE";
+pub static PK: &'static str = "PK";
+pub static TYPE: &'static str = "_TYPE";
 
-pub(super) type DynamoItem = HashMap<String, aws_sdk_dynamodb::types::AttributeValue>;
+pub type DynamoItem = HashMap<String, aws_sdk_dynamodb::types::AttributeValue>;
 
-pub(super) trait DynamoDBItem: Serialize + DeserializeOwned {
+pub trait DynamoDBItem: Serialize + DeserializeOwned {
     type Id;
     fn get_key_from_id(id: Self::Id) -> DynamoItem;
     fn get_key(&self) -> DynamoItem;
@@ -42,14 +40,15 @@ pub(super) trait DynamoDBItem: Serialize + DeserializeOwned {
     }
 }
 
-pub(super) fn table_name() -> String {
+pub fn table_name() -> String {
     let table_name = std::env::var("BACKEND_TABLE_NAME")
         .expect("Mandatory environment variable `BACKEND_TABLE_NAME` is not set");
     log::debug!("BACKEND_TABLE_NAME={table_name}");
     table_name
 }
 
-pub(super) async fn dynamodb_batch_write(
+pub async fn dynamodb_batch_write(
+    client: aws_sdk_dynamodb::Client,
     mut batch_write_requests: Vec<WriteRequest>,
 ) -> Result<(), aws_sdk_dynamodb::Error> {
     // Process the Batch(es) in massively parallel fashion
@@ -67,11 +66,12 @@ pub(super) async fn dynamodb_batch_write(
             .enumerate()
             .map(|(index, chunk)| {
                 let chunk = chunk.to_vec();
+                let cclient = client.clone();
                 tokio::spawn(async move {
                     log::debug!(
                         "dynamodb_reset_game::BATCH - Sending BatchWriteItem for chunk #{index}..."
                     );
-                    let result = dynamodb()
+                    let result = cclient
                         .batch_write_item()
                         .set_request_items(Some([(table_name(), chunk)].into()))
                         .send()
@@ -105,11 +105,12 @@ pub(super) async fn dynamodb_batch_write(
     Ok(())
 }
 
-pub(super) async fn dynamodb_delete_item(
+pub async fn dynamodb_delete_item(
+    client: aws_sdk_dynamodb::Client,
     key: DynamoItem,
 ) -> Result<Option<DynamoItem>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_delete_item - key={key:?}");
-    Ok(dynamodb()
+    Ok(client
         .delete_item()
         .table_name(table_name())
         .set_key(Some(key))
@@ -120,7 +121,7 @@ pub(super) async fn dynamodb_delete_item(
         .map(|delete_output| delete_output.attributes)?)
 }
 
-pub(super) async fn dynamodb_perform_scan(
+pub async fn dynamodb_perform_scan(
     builder: ScanFluentBuilder,
 ) -> Result<Vec<DynamoItem>, aws_sdk_dynamodb::Error> {
     let res = builder.clone().send().await?;

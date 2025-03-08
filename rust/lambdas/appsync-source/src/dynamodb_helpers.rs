@@ -1,17 +1,15 @@
-mod generic;
-
 use std::collections::HashMap;
 
+use appsync_utils::ID;
 use aws_sdk_dynamodb::types::{
     builders::PutRequestBuilder, AttributeValue, ReturnValue, WriteRequest,
 };
-use generic::{
+use dynamodb_utils::{
     dynamodb_batch_write, dynamodb_delete_item, dynamodb_perform_scan, table_name, DynamoDBItem,
     DynamoItem, PK, TYPE,
 };
 use lambda_commons_utils::log;
 use serde_dynamo::{from_attribute_value, to_attribute_value};
-use shared_types::common::Uuid;
 
 use crate::{dynamodb, GameState, GameStatus, Player, Team};
 
@@ -77,7 +75,7 @@ pub async fn dynamodb_reset_game() -> Result<(), aws_sdk_dynamodb::Error> {
                 .build()
         })
         .collect::<Vec<_>>();
-    dynamodb_batch_write(batch_write_requests).await
+    dynamodb_batch_write(dynamodb(), batch_write_requests).await
 }
 
 pub async fn dynamodb_set_game_status(status: GameStatus) -> Result<(), aws_sdk_dynamodb::Error> {
@@ -99,28 +97,16 @@ pub async fn dynamodb_set_game_status(status: GameStatus) -> Result<(), aws_sdk_
         .await?;
     Ok(())
 }
-pub async fn dynamodb_get_game_status() -> Result<Option<GameStatus>, aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_get_game_status");
-
-    Ok(dynamodb()
-        .get_item()
-        .table_name(table_name())
-        .set_key(Some(GameStatus::get_key_from_id(())))
-        .send()
-        .await?
-        .item
-        .map(GameStatus::from_item))
-}
 
 impl Player {
     const PK_TYPE: &'static str = "PLAYER";
-    fn pk_from_uuid(id: Uuid) -> String {
+    fn pk_from_uuid(id: ID) -> String {
         format!("{}#{}", Self::PK_TYPE, id)
     }
 }
 
 impl DynamoDBItem for Player {
-    type Id = Uuid;
+    type Id = ID;
 
     fn get_key(&self) -> DynamoItem {
         Self::get_key_from_id(self.id)
@@ -148,7 +134,7 @@ pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_
     Ok(())
 }
 pub async fn dynamodb_update_player_name(
-    player_id: Uuid,
+    player_id: ID,
     new_name: String,
 ) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_update_player_name - player_id={player_id} new_name={new_name}");
@@ -168,115 +154,17 @@ pub async fn dynamodb_update_player_name(
         .map(Player::from_item)
         .expect("asked for them"))
 }
-pub async fn dynamodb_get_player(
-    player_id: Uuid,
-) -> Result<Option<Player>, aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_get_player - player_id={player_id}");
 
-    Ok(dynamodb()
-        .get_item()
-        .table_name(table_name())
-        .set_key(Some(Player::get_key_from_id(player_id)))
-        .send()
-        .await?
-        .item
-        .map(Player::from_item))
-}
 pub async fn dynamodb_delete_player(
-    player_id: Uuid,
+    player_id: ID,
 ) -> Result<Option<Player>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_delete_player - player_id={player_id}");
 
-    Ok(dynamodb_delete_item(Player::get_key_from_id(player_id))
-        .await?
-        .map(Player::from_item))
-}
-
-pub async fn dynamodb_update_player_click(
-    player_id: Uuid,
-) -> Result<Player, aws_sdk_dynamodb::Error> {
-    log::debug!("ENTER dynamodb_player_click - player_id={player_id}");
-    Ok(dynamodb()
-        .update_item()
-        .table_name(table_name())
-        .set_key(Some(Player::get_key_from_id(player_id)))
-        .update_expression("SET #clicks = if_not_exists(#clicks, :zero) + :one")
-        .expression_attribute_names("#clicks", "clicks")
-        .expression_attribute_values(":zero", AttributeValue::N("0".to_owned()))
-        .expression_attribute_values(":one", AttributeValue::N("1".to_owned()))
-        .condition_expression(format!("attribute_exists({PK})"))
-        .return_values(ReturnValue::AllNew)
-        .send()
-        .await?
-        .attributes
-        .map(Player::from_item)
-        .expect("asked for them"))
-}
-
-pub async fn dynamodb_update_player_latency_stats(
-    player_id: Uuid,
-    old_avg_latency: Option<f64>,
-    old_avg_latency_clicks: Option<i64>,
-    new_avg_latency: f64,
-    new_avg_latency_clicks: i64,
-) -> Result<Player, aws_sdk_dynamodb::Error> {
-    log::debug!(
-        "ENTER dynamodb_update_player_latency_stats - \
-        player_id={player_id} \
-        old_avg_latency={old_avg_latency:?} old_avg_latency_clicks={old_avg_latency_clicks:?} \
-        new_avg_latency={new_avg_latency} new_avg_latency_clicks={new_avg_latency_clicks}
-        "
-    );
-
-    let update = dynamodb()
-        .update_item()
-        .table_name(table_name())
-        .set_key(Some(Player::get_key_from_id(player_id)))
-        .update_expression(
-            "SET #avg_latency = :new_avg_latency, \
-        #avg_latency_clicks = :new_avg_latency_clicks",
-        )
-        .expression_attribute_names("#avg_latency", "avg_latency")
-        .expression_attribute_names("#avg_latency_clicks", "avg_latency_clicks")
-        .expression_attribute_values(
-            ":new_avg_latency",
-            to_attribute_value(new_avg_latency).unwrap(),
-        )
-        .expression_attribute_values(
-            ":new_avg_latency_clicks",
-            to_attribute_value(new_avg_latency_clicks).unwrap(),
-        );
-
-    let update = match (old_avg_latency, old_avg_latency_clicks) {
-        (Some(old_avg_latency), Some(old_avg_latency_clicks)) => update
-            .condition_expression(format!(
-                "attribute_exists({PK}) AND #avg_latency = :old_avg_latency \
-            AND #avg_latency_clicks = :old_avg_latency_clicks"
-            ))
-            .expression_attribute_values(
-                ":old_avg_latency",
-                to_attribute_value(old_avg_latency).unwrap(),
-            )
-            .expression_attribute_values(
-                ":old_avg_latency_clicks",
-                to_attribute_value(old_avg_latency_clicks).unwrap(),
-            ),
-        (None, None) => update.condition_expression(format!(
-            "attribute_exists({PK}) AND attribute_not_exists(#avg_latency) \
-            AND attribute_not_exists(#avg_latency_clicks)"
-        )),
-        _ => unreachable!(
-            "Functionnal error, old_avg_latency and old_avg_latency_clicks \
-            can only be both None or both Some"
-        ),
-    };
-    Ok(update
-        .return_values(ReturnValue::AllNew)
-        .send()
-        .await?
-        .attributes
-        .map(Player::from_item)
-        .expect("asked for them"))
+    Ok(
+        dynamodb_delete_item(dynamodb(), Player::get_key_from_id(player_id))
+            .await?
+            .map(Player::from_item),
+    )
 }
 
 pub async fn dynamodb_query_teams_player_count(
@@ -327,7 +215,7 @@ pub async fn dynamodb_query_game_state() -> Result<GameState, aws_sdk_dynamodb::
         players: vec![],
     };
 
-    let mut players: HashMap<Uuid, Player> = HashMap::new();
+    let mut players: HashMap<ID, Player> = HashMap::new();
     // We do 2-pass on the scan result to ensure we found all the PLAYER_META
     // before processing the PLAYER_CLICKS & PLAYER_LATENCY
     // The alternative is to sort the scan result, but it will be O(n.log(n)) operation

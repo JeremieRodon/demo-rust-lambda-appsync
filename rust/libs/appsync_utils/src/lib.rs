@@ -1,9 +1,12 @@
+mod id;
 use std::{collections::HashMap, ops::BitOr};
 
-use lambda_commons_utils::serde_json::Value;
+use serde_json::{self, Value};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
+
+pub use id::ID;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
@@ -93,4 +96,25 @@ impl From<aws_sdk_dynamodb::Error> for AppSyncError {
             error_message: meta.message().unwrap_or_default().to_owned(),
         }
     }
+}
+
+pub fn arg_from_json<T: DeserializeOwned>(
+    args: &mut serde_json::Value,
+    arg_name: &'static str,
+) -> Result<T, AppSyncError> {
+    serde_json::from_value(
+        args.get_mut(arg_name)
+            .unwrap_or(&mut serde_json::Value::Null)
+            .take(),
+    )
+    .map_err(|e| {
+        AppSyncError::new(
+            "InvalidArgs",
+            format!("Argument \"{arg_name}\" is not the expected format ({e})"),
+        )
+    })
+}
+
+pub fn res_to_json<T: Serialize>(res: T) -> serde_json::Value {
+    serde_json::to_value(res).expect("AppSync schema objects are JSON compatible")
 }

@@ -1,5 +1,4 @@
 mod dynamodb_helpers;
-mod game;
 mod operations;
 
 use appsync_utils::{

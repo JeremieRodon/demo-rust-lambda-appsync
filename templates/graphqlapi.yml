@@ -39,15 +39,13 @@ Mappings:
           registerNewPlayer,
           updatePlayerName,
           removePlayer,
-          clickRust,
-          reportLatencyRust,
         ]
       Subscription: [updatedPlayer, removedPlayer, updatedGameStatus]
 
 Resources:
-  ##################################
-  # Rust AppSync GraphQL Resolvers #
-  ##################################
+  ############################################
+  # Generic (Rust) AppSync GraphQL Resolvers #
+  ############################################
   "Fn::ForEach::RustOps":
     - OpType
     - [Query, Mutation, Subscription]
@@ -65,6 +63,32 @@ Resources:
               FieldName: !Ref Op
               MaxBatchSize: 100
               MetricsConfig: ENABLED
+  ##################################
+  # Rust AppSync GraphQL Resolvers #
+  ##################################
+  RustMutationclickRustResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt BenchLambdaDatasource.Name
+      Kind: UNIT
+      TypeName: Mutation
+      FieldName: clickRust
+      MaxBatchSize: 100
+      MetricsConfig: ENABLED
+  RustMutationreportLatencyRustResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DataSourceName: !GetAtt BenchLambdaDatasource.Name
+      Kind: UNIT
+      TypeName: Mutation
+      FieldName: reportLatencyRust
+      MaxBatchSize: 100
+      MetricsConfig: ENABLED
+
   #################################
   # VTL AppSync GraphQL Resolvers #
   #################################
@@ -434,6 +458,54 @@ Resources:
   ################
   # Data Sources #
   ################
+  DatasourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub gql-${ProjectName}-datasource
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-lambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt AppsyncSourceFunction.Arn
+                  - !GetAtt AppsyncBenchSourceFunction.Arn
+      Path: /
+  BackendTableAccessRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncSourceFunctionRole
+        - !Ref AppsyncBenchSourceFunctionRole
+        - !Ref DatasourceRole
+      PolicyName: dynamodb
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: FullDataAccess
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
   BackendTableDatasource:
     Type: AWS::AppSync::DataSource
     Properties:
@@ -444,19 +516,8 @@ Resources:
         AwsRegion: !Ref AWS::Region
         TableName: !Ref BackendTable
         UseCallerCredentials: false
-      ServiceRoleArn: !GetAtt BackendTableDatasourceRole.Arn
-  BackendTableDatasourceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub gql-${ProjectName}-dynamodb-access
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: appsync.amazonaws.com
-            Action: sts:AssumeRole
-      Path: /
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
   AppsyncSourceFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -471,7 +532,7 @@ Resources:
   AppsyncSourceFunctionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub lambda-${ProjectName}-dynamodb-access
+      RoleName: !Sub lambda-${ProjectName}-appsync-source
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -494,31 +555,6 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: !GetAtt AppsyncSourceFunctionLogGroup.Arn
-  BackendTableAccessRolePolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      Roles:
-        - !Ref AppsyncSourceFunctionRole
-        - !Ref BackendTableDatasourceRole
-      PolicyName: dynamodb
-      PolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Sid: FullDataAccess
-            Effect: Allow
-            Action:
-              - dynamodb:GetItem
-              - dynamodb:PutItem
-              - dynamodb:UpdateItem
-              - dynamodb:DeleteItem
-              - dynamodb:Query
-              - dynamodb:Scan
-              - dynamodb:BatchGetItem
-              - dynamodb:BatchWriteItem
-              - dynamodb:ConditionCheckItem
-            Resource:
-              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
-              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
   LambdaDatasource:
     Type: AWS::AppSync::DataSource
     Properties:
@@ -527,61 +563,54 @@ Resources:
       Name: lambda_source
       LambdaConfig:
         LambdaFunctionArn: !GetAtt AppsyncSourceFunction.Arn
-      ServiceRoleArn: !GetAtt LambdaDatasourceRole.Arn
-  LambdaDatasourceRole:
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
+  AppsyncBenchSourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-appsync-bench-source
+      CodeUri: ../rust/lambdas/appsync-bench-source
+      Role: !GetAtt AppsyncBenchSourceFunctionRole.Arn
+  AppsyncBenchSourceFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AppsyncBenchSourceFunction}
+      RetentionInDays: 90
+  AppsyncBenchSourceFunctionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub gql-${ProjectName}-datasource-lambda
+      RoleName: !Sub lambda-${ProjectName}-appsync-bench-source
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
           - Effect: Allow
             Principal:
-              Service: appsync.amazonaws.com
+              Service: lambda.amazonaws.com
             Action: sts:AssumeRole
-      Policies:
-        - PolicyName: invoke-lambda
-          PolicyDocument:
-            Version: 2012-10-17
-            Statement:
-              - Effect: Allow
-                Action: lambda:InvokeFunction
-                Resource: !GetAtt AppsyncSourceFunction.Arn
       Path: /
-
-  # QueryTentativeGuestRequestsResolver:
-  #   Type: AWS::AppSync::Resolver
-  #   DependsOn: GraphQLApiSchema
-  #   Properties:
-  #     ApiId: !GetAtt GraphQLApi.ApiId
-  #     DataSourceName: !GetAtt LambdaDatasource.Name
-  #     Kind: UNIT
-  #     TypeName: Query
-  #     FieldName: tentativeGuestRequests
-  #     MaxBatchSize: 100
-  #     MetricsConfig: ENABLED
-  # MutationCreateGuestGroupResolver:
-  #   Type: AWS::AppSync::Resolver
-  #   DependsOn: GraphQLApiSchema
-  #   Properties:
-  #     ApiId: !GetAtt GraphQLApi.ApiId
-  #     DataSourceName: !GetAtt LambdaDatasource.Name
-  #     Kind: UNIT
-  #     TypeName: Mutation
-  #     FieldName: createGuestGroup
-  #     MaxBatchSize: 100
-  #     MetricsConfig: ENABLED
-  # SubscriptionCreatedGuestGroupResolver:
-  #   Type: AWS::AppSync::Resolver
-  #   DependsOn: GraphQLApiSchema
-  #   Properties:
-  #     ApiId: !GetAtt GraphQLApi.ApiId
-  #     DataSourceName: !GetAtt LambdaDatasource.Name
-  #     Kind: UNIT
-  #     TypeName: Subscription
-  #     FieldName: createdGuestGroup
-  #     MaxBatchSize: 100
-  #     MetricsConfig: ENABLED
+  AppsyncBenchSourceFunctionRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncBenchSourceFunctionRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt AppsyncBenchSourceFunctionLogGroup.Arn
+  BenchLambdaDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AWS_LAMBDA
+      Name: bench_lambda_source
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt AppsyncBenchSourceFunction.Arn
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
 
 Outputs:
   ApiUrl:

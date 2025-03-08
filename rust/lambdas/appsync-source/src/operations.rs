@@ -1,24 +1,17 @@
 use std::collections::HashSet;
 
-use lambda_commons_utils::tokio;
-use shared_types::common::Uuid;
-
 use crate::{
-    appsync_utils::AppSyncError,
-    dynamodb_utils::{
-        dynamodb_delete_player, dynamodb_get_game_status, dynamodb_get_player,
-        dynamodb_put_new_player, dynamodb_query_game_state, dynamodb_query_teams_player_count,
-        dynamodb_reset_game, dynamodb_update_player_click, dynamodb_update_player_latency_stats,
+    dynamodb_helpers::{
+        dynamodb_delete_player, dynamodb_put_new_player, dynamodb_query_game_state,
+        dynamodb_query_teams_player_count, dynamodb_reset_game, dynamodb_set_game_status,
         dynamodb_update_player_name,
     },
-    GameState, GameStatus, LatencyReport, Player, Team,
+    GameState, GameStatus, Player, Team,
 };
+use appsync_utils::{AppSyncError, ID};
 
 fn player_not_found() -> AppSyncError {
     AppSyncError::new("PlayerNotFound", "Player does not exist")
-}
-fn invalid_game_status() -> AppSyncError {
-    AppSyncError::new("InvalidGameStatus", "Game is not started")
 }
 
 impl crate::Operation {
@@ -41,7 +34,7 @@ macro_rules! game_status_mut {
                 if false {
                     return <crate::Operation as crate::DefautOperations>::$mut_name().await;
                 }
-                crate::dynamodb_utils::dynamodb_set_game_status($status).await?;
+                dynamodb_set_game_status($status).await?;
                 Ok($status)
             }
         }
@@ -89,7 +82,7 @@ impl crate::Operation {
             teams_player_count.sort_by_key(|o| o.1);
             teams_player_count[0].0
         };
-        let id = Uuid::new_v4();
+        let id = ID::new();
         let new_player = Player {
             id,
             name,
@@ -105,7 +98,7 @@ impl crate::Operation {
 
 impl crate::Operation {
     pub async fn mutation_update_player_name(
-        player_id: Uuid,
+        player_id: ID,
         new_name: String,
     ) -> Result<Player, AppSyncError> {
         // This is just a marker to ensure an error is thrown if the user did not chose
@@ -121,7 +114,7 @@ impl crate::Operation {
 }
 
 impl crate::Operation {
-    pub async fn mutation_remove_player(player_id: Uuid) -> Result<Player, AppSyncError> {
+    pub async fn mutation_remove_player(player_id: ID) -> Result<Player, AppSyncError> {
         // This is just a marker to ensure an error is thrown if the user did not chose
         // the correct signature for the function. Should be optimized away by the compiler.
         if false {
@@ -133,81 +126,5 @@ impl crate::Operation {
         Ok(dynamodb_delete_player(player_id)
             .await?
             .ok_or_else(player_not_found)?)
-    }
-}
-
-impl crate::Operation {
-    pub async fn mutation_click_rust(player_id: Uuid) -> Result<Player, AppSyncError> {
-        // This is just a marker to ensure an error is thrown if the user did not chose
-        // the correct signature for the function. Should be optimized away by the compiler.
-        if false {
-            return <crate::Operation as crate::DefautOperations>::mutation_click_rust(player_id)
-                .await;
-        }
-
-        let game_status = dynamodb_get_game_status()
-            .await?
-            .ok_or_else(invalid_game_status)?;
-        if game_status != GameStatus::Started {
-            return Err(invalid_game_status());
-        }
-        Ok(dynamodb_update_player_click(player_id).await?)
-    }
-}
-
-impl crate::Operation {
-    pub async fn mutation_report_latency_rust(
-        player_id: Uuid,
-        report: LatencyReport,
-    ) -> Result<Player, AppSyncError> {
-        // This is just a marker to ensure an error is thrown if the user did not chose
-        // the correct signature for the function. Should be optimized away by the compiler.
-        if false {
-            return <crate::Operation as crate::DefautOperations>::mutation_report_latency_rust(
-                player_id, report,
-            )
-            .await;
-        }
-        let player_req = tokio::spawn(dynamodb_get_player(player_id));
-        let game_status = dynamodb_get_game_status()
-            .await?
-            .ok_or_else(invalid_game_status)?;
-        if game_status != GameStatus::Started {
-            return Err(invalid_game_status());
-        }
-        // Retrieve the current player
-        let player = player_req.await.unwrap()?.ok_or_else(player_not_found)?;
-        let LatencyReport {
-            clicks,
-            avg_latency,
-        } = report;
-        let old_avg_latency = player.avg_latency;
-        let old_avg_latency_clicks = player.avg_latency_clicks;
-        let old_total_latency = match (old_avg_latency, old_avg_latency_clicks) {
-            (Some(old_avg_latency), Some(old_avg_latency_clicks)) => {
-                old_avg_latency * (old_avg_latency_clicks as f64)
-            }
-            (None, None) => 0f64,
-            _ => unreachable!(
-                "Functionnal error, old_avg_latency and old_avg_latency_clicks \
-        can only be both None or both Some"
-            ),
-        };
-        let new_total_latency = old_total_latency + avg_latency * (clicks as f64);
-        let new_avg_latency_clicks = old_avg_latency_clicks.unwrap_or_default() + clicks;
-
-        let new_avg_latency = new_total_latency / (new_avg_latency_clicks as f64);
-        if new_avg_latency.is_finite() {
-            Ok(dynamodb_update_player_latency_stats(
-                player_id,
-                old_avg_latency,
-                old_avg_latency_clicks,
-                new_avg_latency,
-                new_avg_latency_clicks,
-            )
-            .await?)
-        } else {
-            Ok(player)
-        }
     }
 }

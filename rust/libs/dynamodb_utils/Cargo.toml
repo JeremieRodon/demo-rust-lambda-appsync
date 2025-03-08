@@ -1,5 +1,5 @@
 [package]
-name = "shared_types"
+name = "dynamodb_utils"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -8,11 +8,10 @@ authors.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tokio = { workspace = true}
 aws-sdk-dynamodb = { workspace = true }
+
+log = { workspace = true }
 
 serde = { workspace = true }
 serde_dynamo = { workspace = true }
-
-uuid = { workspace = true }
-
-log = { workspace = true }
