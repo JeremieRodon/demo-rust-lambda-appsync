@@ -117,8 +117,8 @@ Resources:
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
-          - !GetAtt VtlGetGameStatusFunction.Name
-          - !GetAtt VtlUpdateClickFunction.Name
+          - !GetAtt VtlGetGameStatusFunction.FunctionId
+          - !GetAtt VtlUpdateClickFunction.FunctionId
   VtlMutationreportLatencyVtlResolver:
     Type: AWS::AppSync::Resolver
     DependsOn: GraphQLApiSchema
@@ -132,9 +132,9 @@ Resources:
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
-          - !GetAtt VtlGetGameStatusFunction.Name
-          - !GetAtt VtlGetPlayerFunction.Name
-          - !GetAtt VtlUpdateLatencyFunction.Name
+          - !GetAtt VtlGetGameStatusFunction.FunctionId
+          - !GetAtt VtlGetPlayerFunction.FunctionId
+          - !GetAtt VtlUpdateLatencyFunction.FunctionId
 
   ################################
   # JS AppSync GraphQL Resolvers #
@@ -311,8 +311,8 @@ Resources:
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
-          - !GetAtt JsGetGameStatusFunction.Name
-          - !GetAtt JsUpdateClickFunction.Name
+          - !GetAtt JsGetGameStatusFunction.FunctionId
+          - !GetAtt JsUpdateClickFunction.FunctionId
   JsMutationreportLatencyJsResolver:
     Type: AWS::AppSync::Resolver
     DependsOn: GraphQLApiSchema
@@ -334,9 +334,9 @@ Resources:
       MetricsConfig: ENABLED
       PipelineConfig:
         Functions:
-          - !GetAtt JsGetGameStatusFunction.Name
-          - !GetAtt JsGetPlayerFunction.Name
-          - !GetAtt JsUpdateLatencyFunction.Name
+          - !GetAtt JsGetGameStatusFunction.FunctionId
+          - !GetAtt JsGetPlayerFunction.FunctionId
+          - !GetAtt JsUpdateLatencyFunction.FunctionId
 
   #################
   # Backend table #
