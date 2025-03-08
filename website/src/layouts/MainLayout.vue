@@ -9,10 +9,16 @@ const client = inject('appsync_client');
 
 const game_status = ref(null);
 provide('game_status', game_status);
-const players = reactive(new Map());
-provide('players', players);
 const teams = reactive(new Map());
 provide('teams', teams);
+
+const players = reactive(new Map());
+const sorted_players = computed(() => {
+  const sorted_players = [...players.values()];
+  sorted_players.sort((p1, p2) => p2.clicks - p1.clicks);
+  return sorted_players;
+});
+provide('sorted_players', sorted_players);
 
 function update_game_status(status) {
   game_status.value = status;

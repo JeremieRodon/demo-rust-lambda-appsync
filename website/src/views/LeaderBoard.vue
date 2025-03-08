@@ -1,14 +1,8 @@
 <script setup>
 import PlayerScore from '@/components/PlayerScore.vue';
-import { computed, inject } from 'vue';
+import { inject } from 'vue';
 
-const players = inject('players');
-
-const sorted_players = computed(() => {
-  const sorted_players = [...players.values()];
-  sorted_players.sort((p1, p2) => p2.clicks - p1.clicks);
-  return sorted_players;
-});
+const sorted_players = inject('sorted_players');
 </script>
 
 <template>

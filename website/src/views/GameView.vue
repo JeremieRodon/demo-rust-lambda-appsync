@@ -3,6 +3,9 @@ import CChangeName from '@/components/CChangeName.vue';
 import CRegistration from '@/components/CRegistration.vue';
 import TeamIcon from '@/components/TeamIcon.vue';
 import TeamScore from '@/components/TeamScore.vue';
+import DisplayPlayerClicks from '@/components/DisplayPlayerClicks.vue';
+import DisplayPlayerLatency from '@/components/DisplayPlayerLatency.vue';
+import DisplayPlayerRank from '@/components/DisplayPlayerRank.vue';
 import { alert_appsync_error, team_to_displayname } from '@/modules/utils';
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 
@@ -10,6 +13,8 @@ const current_player = inject('current_player');
 const teams = inject('teams');
 const game_status = inject('game_status');
 const client = inject('appsync_client');
+
+const sorted_players = inject('sorted_players');
 
 const change_name_modal_open = ref(false);
 
@@ -42,6 +47,34 @@ const current_player_team = computed(() => {
     return null;
   }
 });
+const current_player_rank = computed(() => {
+  if (current_player_id.value) {
+    const player_id = current_player_id.value;
+    for (let i = 0; i < sorted_players.value.length; i++) {
+      if (sorted_players.value[i].id == player_id) {
+        return i + 1;
+      }
+    }
+  }
+  return null;
+});
+
+const current_player_clicks = computed(() => {
+  if (current_player.value) {
+    return current_player.value.clicks;
+  } else {
+    return 0;
+  }
+});
+
+const current_player_avg_latency = computed(() => {
+  if (current_player.value) {
+    return Math.round(current_player.value.avg_latency * 100) / 100;
+  } else {
+    return NaN;
+  }
+});
+
 const current_player_team_name = computed(() => {
   return team_to_displayname(current_player_team.value);
 });
@@ -189,32 +222,37 @@ onUnmounted(() => {
 <template>
   <main>
     <div class="px-2 md:px-4 mx-auto max-w-screen-lg">
-      <div class="flex flex-row justify-center items-center m-4 gap-2">
-        <team-icon :name="current_player_team" class="h-16"></team-icon>
-        <div class="flex flex-col items-start">
-          <div class="text-xl font-black text-wrap [word-break:break-word]">
-            {{ current_player_name }}
+      <div class="flex flex-col m-2 sm:m-4">
+        <div class="flex flex-row justify-center items-center gap-2">
+          <team-icon :name="current_player_team" class="h-16"></team-icon>
+          <div class="flex flex-col items-start">
+            <div class="text-xl font-black text-wrap [word-break:break-word]">
+              {{ current_player_name }}
+            </div>
+            <div class="text-sm font-light text-nowrap overflow-visible">
+              {{ current_player_team_name }}
+            </div>
           </div>
-          <div class="text-sm font-light text-nowrap overflow-visible">
-            {{ current_player_team_name }}
-          </div>
+          <button class="btn btn-circle btn-ghost" @click="change_name_modal_open = true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 fill-primary" viewBox="0 0 24 24">
+              <path
+                d="M19.71,8.04L17.37,10.37L13.62,6.62L15.96,4.29C16.35,3.9 17,3.9 17.37,4.29L19.71,6.63C20.1,7 20.1,7.65 19.71,8.04M3,17.25L13.06,7.18L16.81,10.93L6.75,21H3V17.25M16.62,5.04L15.08,6.58L17.42,8.92L18.96,7.38L16.62,5.04M15.36,11L13,8.64L4,17.66V20H6.34L15.36,11Z"
+              />
+            </svg>
+          </button>
         </div>
-        <button class="btn btn-circle btn-ghost" @click="change_name_modal_open = true">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 fill-primary" viewBox="0 0 24 24">
-            <path
-              d="M19.71,8.04L17.37,10.37L13.62,6.62L15.96,4.29C16.35,3.9 17,3.9 17.37,4.29L19.71,6.63C20.1,7 20.1,7.65 19.71,8.04M3,17.25L13.06,7.18L16.81,10.93L6.75,21H3V17.25M16.62,5.04L15.08,6.58L17.42,8.92L18.96,7.38L16.62,5.04M15.36,11L13,8.64L4,17.66V20H6.34L15.36,11Z"
-            />
-          </svg>
-        </button>
+        <div class="flex flex-row justify-center items-center gap-4">
+          <display-player-rank :rank="current_player_rank"></display-player-rank>
+          <display-player-clicks :clicks="current_player_clicks"></display-player-clicks>
+          <display-player-latency
+            :avg_latency="current_player_avg_latency"
+          ></display-player-latency>
+        </div>
       </div>
-      <div class="max-w-4xl mx-auto">
-        <template v-for="team in sorted_teams" :key="team.team_name">
-          <team-score :team="team"></team-score>
-        </template>
-      </div>
-      <div class="w-fit mx-auto my-8">
+
+      <div class="sm:w-fit mx-auto">
         <button
-          class="btn uppercase btn-secondary font-black text-4xl py-16 px-8"
+          class="btn btn-block uppercase btn-secondary font-black text-5xl py-16 sm:py-20 px-12"
           :disabled="game_status != 'STARTED'"
           @click="call_click"
         >
@@ -225,6 +263,13 @@ onUnmounted(() => {
           </svg>
           Smash!!
         </button>
+      </div>
+
+      <h2 class="text-base-content/40 text-xl font-bold text-center">Team scores</h2>
+      <div class="max-w-4xl mx-auto">
+        <template v-for="team in sorted_teams" :key="team.team_name">
+          <team-score :team="team"></team-score>
+        </template>
       </div>
     </div>
     <c-registration></c-registration>
