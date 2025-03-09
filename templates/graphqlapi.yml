@@ -667,7 +667,7 @@ Resources:
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Type: AWS_LAMBDA
-      Name: rust_bench_lambda_source
+      Name: python_bench_lambda_source
       LambdaConfig:
         LambdaFunctionArn: !GetAtt AppsyncPythonBenchSourceFunction.Arn
       ServiceRoleArn: !GetAtt DatasourceRole.Arn
