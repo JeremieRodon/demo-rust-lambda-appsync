@@ -4,7 +4,6 @@ import TeamIcon from './TeamIcon.vue';
 import { team_to_displayname } from '@/modules/utils';
 
 const props = defineProps({
-  rank: Number,
   team: Object,
 });
 
@@ -30,18 +29,15 @@ const team_avg_latency_rounded = computed(() => {
 
 <template>
   <div
-    class="flex flex-row max-w-sm mx-auto sm:max-w-full m-2 p-1 rounded-box"
+    class="flex flex-row max-w-xs mx-auto sm:max-w-full m-2 p-1 rounded-box"
     :class="is_current_player_team ? 'border-2 border-secondary' : 'border'"
   >
-    <div class="flex flex-col sm:flex-row items-center">
-      <div class="text-lg font-bold self-center text-center sm:ml-2">#{{ rank }}</div>
-      <team-icon :name="team.team_name" class="h-14 m-2 mt-0 sm:ml-2 sm:m-4 self-end"></team-icon>
-    </div>
+    <team-icon :name="team.team_name" class="h-16 m-2 sm:m-4 self-end"></team-icon>
     <div
       class="grid grid-cols-2 grid-rows-3 sm:grid-cols-6 sm:grid-rows-1 grow gap-2 sm:gap-0 items-center"
     >
       <div
-        class="text-base-content/60 font-bold text-end sm:text-center text-sm sm:text-base justify-self-end text-nowrap sm:text-wrap"
+        class="text-base-content/60 font-bold text-end sm:text-center text-sm sm:text-base justify-self-end text-nowrap"
       >
         {{ team_display_name }}
       </div>

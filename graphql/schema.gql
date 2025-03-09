@@ -19,9 +19,12 @@ type Mutation {
   removePlayer(player_id: ID!): Player!
     @aws_cognito_user_pools(cognito_groups: ["Admins"])
   clickRust(player_id: ID!): Player! @aws_api_key
+  clickPython(player_id: ID!): Player! @aws_api_key
   clickJs(player_id: ID!): Player! @aws_api_key
   clickVtl(player_id: ID!): Player! @aws_api_key
   reportLatencyRust(player_id: ID!, report: LatencyReport!): Player!
+    @aws_api_key
+  reportLatencyPython(player_id: ID!, report: LatencyReport!): Player!
     @aws_api_key
   reportLatencyJs(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
   reportLatencyVtl(player_id: ID!, report: LatencyReport!): Player! @aws_api_key
@@ -36,9 +39,11 @@ type Subscription {
         "registerNewPlayer"
         "updatePlayerName"
         "clickRust"
+        "clickPython"
         "clickJs"
         "clickVtl"
         "reportLatencyRust"
+        "reportLatencyPython"
         "reportLatencyJs"
         "reportLatencyVtl"
       ]

@@ -66,29 +66,38 @@ Resources:
   ##################################
   # Rust AppSync GraphQL Resolvers #
   ##################################
-  RustMutationclickRustResolver:
-    Type: AWS::AppSync::Resolver
-    DependsOn: GraphQLApiSchema
-    Properties:
-      ApiId: !GetAtt GraphQLApi.ApiId
-      DataSourceName: !GetAtt BenchLambdaDatasource.Name
-      Kind: UNIT
-      TypeName: Mutation
-      FieldName: clickRust
-      MaxBatchSize: 100
-      MetricsConfig: ENABLED
-  RustMutationreportLatencyRustResolver:
-    Type: AWS::AppSync::Resolver
-    DependsOn: GraphQLApiSchema
-    Properties:
-      ApiId: !GetAtt GraphQLApi.ApiId
-      DataSourceName: !GetAtt BenchLambdaDatasource.Name
-      Kind: UNIT
-      TypeName: Mutation
-      FieldName: reportLatencyRust
-      MaxBatchSize: 100
-      MetricsConfig: ENABLED
+  "Fn::ForEach::RustBench":
+    - Op
+    - [clickRust, reportLatencyRust]
+    - "RustMutation${Op}Resolver":
+        Type: AWS::AppSync::Resolver
+        DependsOn: GraphQLApiSchema
+        Properties:
+          ApiId: !GetAtt GraphQLApi.ApiId
+          DataSourceName: !GetAtt RustBenchLambdaDatasource.Name
+          Kind: UNIT
+          TypeName: Mutation
+          FieldName: !Ref Op
+          MaxBatchSize: 100
+          MetricsConfig: ENABLED
 
+  ####################################
+  # Python AppSync GraphQL Resolvers #
+  ####################################
+  "Fn::ForEach::PythonBench":
+    - Op
+    - [clickPython, reportLatencyPython]
+    - "RustMutation${Op}Resolver":
+        Type: AWS::AppSync::Resolver
+        DependsOn: GraphQLApiSchema
+        Properties:
+          ApiId: !GetAtt GraphQLApi.ApiId
+          DataSourceName: !GetAtt PythonBenchLambdaDatasource.Name
+          Kind: UNIT
+          TypeName: Mutation
+          FieldName: !Ref Op
+          MaxBatchSize: 100
+          MetricsConfig: ENABLED
   #################################
   # VTL AppSync GraphQL Resolvers #
   #################################
@@ -478,14 +487,16 @@ Resources:
                 Action: lambda:InvokeFunction
                 Resource:
                   - !GetAtt AppsyncSourceFunction.Arn
-                  - !GetAtt AppsyncBenchSourceFunction.Arn
+                  - !GetAtt AppsyncRustBenchSourceFunction.Arn
+                  - !GetAtt AppsyncPythonBenchSourceFunction.Arn
       Path: /
   BackendTableAccessRolePolicy:
     Type: AWS::IAM::Policy
     Properties:
       Roles:
         - !Ref AppsyncSourceFunctionRole
-        - !Ref AppsyncBenchSourceFunctionRole
+        - !Ref AppsyncRustBenchSourceFunctionRole
+        - !Ref AppsyncPythonBenchSourceFunctionRole
         - !Ref DatasourceRole
       PolicyName: dynamodb
       PolicyDocument:
@@ -565,21 +576,21 @@ Resources:
         LambdaFunctionArn: !GetAtt AppsyncSourceFunction.Arn
       ServiceRoleArn: !GetAtt DatasourceRole.Arn
 
-  AppsyncBenchSourceFunction:
+  AppsyncRustBenchSourceFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub ${ProjectName}-appsync-bench-source
+      FunctionName: !Sub ${ProjectName}-appsync-rust-bench-source
       CodeUri: ../rust/lambdas/appsync-bench-source
-      Role: !GetAtt AppsyncBenchSourceFunctionRole.Arn
-  AppsyncBenchSourceFunctionLogGroup:
+      Role: !GetAtt AppsyncRustBenchSourceFunctionRole.Arn
+  AppsyncRustBenchSourceFunctionLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub /aws/lambda/${AppsyncBenchSourceFunction}
+      LogGroupName: !Sub /aws/lambda/${AppsyncRustBenchSourceFunction}
       RetentionInDays: 90
-  AppsyncBenchSourceFunctionRole:
+  AppsyncRustBenchSourceFunctionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub lambda-${ProjectName}-appsync-bench-source
+      RoleName: !Sub lambda-${ProjectName}-appsync-rust-bench-source
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -588,11 +599,11 @@ Resources:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Path: /
-  AppsyncBenchSourceFunctionRoleBasicPolicy:
+  AppsyncRustBenchSourceFunctionRoleBasicPolicy:
     Type: AWS::IAM::Policy
     Properties:
       Roles:
-        - !Ref AppsyncBenchSourceFunctionRole
+        - !Ref AppsyncRustBenchSourceFunctionRole
       PolicyName: basic-lambda
       PolicyDocument:
         Version: 2012-10-17
@@ -601,15 +612,64 @@ Resources:
             Action:
               - logs:CreateLogStream
               - logs:PutLogEvents
-            Resource: !GetAtt AppsyncBenchSourceFunctionLogGroup.Arn
-  BenchLambdaDatasource:
+            Resource: !GetAtt AppsyncRustBenchSourceFunctionLogGroup.Arn
+  RustBenchLambdaDatasource:
     Type: AWS::AppSync::DataSource
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Type: AWS_LAMBDA
-      Name: bench_lambda_source
+      Name: rust_bench_lambda_source
       LambdaConfig:
-        LambdaFunctionArn: !GetAtt AppsyncBenchSourceFunction.Arn
+        LambdaFunctionArn: !GetAtt AppsyncRustBenchSourceFunction.Arn
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
+  AppsyncPythonBenchSourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-appsync-python-bench-source
+      Runtime: python3.13
+      Handler: index.lambda_handler
+      CodeUri: ../python/lambdas/appsync-bench-source
+      Role: !GetAtt AppsyncPythonBenchSourceFunctionRole.Arn
+  AppsyncPythonBenchSourceFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AppsyncPythonBenchSourceFunction}
+      RetentionInDays: 90
+  AppsyncPythonBenchSourceFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-appsync-python-bench-source
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  AppsyncPythonBenchSourceFunctionRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncPythonBenchSourceFunctionRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt AppsyncPythonBenchSourceFunctionLogGroup.Arn
+  PythonBenchLambdaDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AWS_LAMBDA
+      Name: rust_bench_lambda_source
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt AppsyncPythonBenchSourceFunction.Arn
       ServiceRoleArn: !GetAtt DatasourceRole.Arn
 
 Outputs:

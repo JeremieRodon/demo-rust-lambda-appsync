@@ -2,8 +2,8 @@
 import { computed, inject, ref } from 'vue';
 import TeamIcon from './TeamIcon.vue';
 import { alert_appsync_error, alert_success } from '@/modules/utils';
-import DisplayPlayerClicks from './DisplayPlayerClicks.vue';
-import DisplayPlayerLatency from './DisplayPlayerLatency.vue';
+import DisplayPlayerClicks from './DisplayClicks.vue';
+import DisplayPlayerLatency from './DisplayLatency.vue';
 
 const props = defineProps({
   rank: Number,
@@ -74,7 +74,7 @@ async function delete_player() {
 <template>
   <div
     class="flex flex-row max-w-full min-w-fit gap-2"
-    :class="is_current_player ? 'border-2 border-secondary rounded-box' : ''"
+    :class="is_current_player ? 'border-2 border-secondary' : ''"
   >
     <div class="basis-1/6 sm:basis-1/12 text-lg font-bold self-center grow text-center">
       #{{ rank }}

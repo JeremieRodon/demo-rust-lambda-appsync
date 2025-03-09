@@ -11,6 +11,22 @@ const game_status = ref(null);
 provide('game_status', game_status);
 const teams = reactive(new Map());
 provide('teams', teams);
+const sorted_teams = computed(() => {
+  const sorted_teams = [...teams.values()];
+  sorted_teams.sort((t1, t2) => {
+    if (isNaN(t1.avg_latency) && isNaN(t2.avg_latency)) {
+      return 0;
+    } else if (isNaN(t1.avg_latency)) {
+      return 1;
+    } else if (isNaN(t2.avg_latency)) {
+      return -1;
+    } else {
+      return t1.avg_latency - t2.avg_latency;
+    }
+  });
+  return sorted_teams;
+});
+provide('sorted_teams', sorted_teams);
 
 const players = reactive(new Map());
 const sorted_players = computed(() => {
@@ -263,14 +279,14 @@ function unsubscribe_updates() {
 }
 
 onMounted(async () => {
-  console.log('onMounted BEGIN');
+  console.log('MainLayout onMounted BEGIN');
   await load_game_state();
-  console.log('onMounted END');
+  console.log('MainLayout onMounted END');
 });
 onUnmounted(() => {
-  console.log('onUnmounted BEGIN');
+  console.log('MainLayout onUnmounted BEGIN');
   unsubscribe_updates();
-  console.log('onUnmounted END');
+  console.log('MainLayout onUnmounted END');
 });
 </script>
 

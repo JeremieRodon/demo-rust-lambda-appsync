@@ -2,29 +2,21 @@
 import CChangeName from '@/components/CChangeName.vue';
 import CRegistration from '@/components/CRegistration.vue';
 import TeamIcon from '@/components/TeamIcon.vue';
-import TeamScore from '@/components/TeamScore.vue';
-import DisplayPlayerClicks from '@/components/DisplayPlayerClicks.vue';
-import DisplayPlayerLatency from '@/components/DisplayPlayerLatency.vue';
-import DisplayPlayerRank from '@/components/DisplayPlayerRank.vue';
+import DisplayClicks from '@/components/DisplayClicks.vue';
+import DisplayLatency from '@/components/DisplayLatency.vue';
+import DisplayRank from '@/components/DisplayRank.vue';
 import { alert_appsync_error, team_to_displayname } from '@/modules/utils';
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
+import DisplayPlayerCount from '@/components/DisplayPlayerCount.vue';
 
 const current_player = inject('current_player');
-const teams = inject('teams');
 const game_status = inject('game_status');
 const client = inject('appsync_client');
 
 const sorted_players = inject('sorted_players');
+const teams = inject('teams');
 
 const change_name_modal_open = ref(false);
-
-watch([game_status, current_player], () => {
-  if (current_player.value && game_status.value == 'STARTED') {
-    begin_reporting();
-  } else {
-    stop_reporting();
-  }
-});
 
 const current_player_id = computed(() => {
   if (current_player.value) {
@@ -40,7 +32,7 @@ const current_player_name = computed(() => {
     return 'PlaceHolder';
   }
 });
-const current_player_team = computed(() => {
+const current_player_team_id = computed(() => {
   if (current_player.value) {
     return current_player.value.team;
   } else {
@@ -58,7 +50,6 @@ const current_player_rank = computed(() => {
   }
   return null;
 });
-
 const current_player_clicks = computed(() => {
   if (current_player.value) {
     return current_player.value.clicks;
@@ -66,7 +57,6 @@ const current_player_clicks = computed(() => {
     return 0;
   }
 });
-
 const current_player_avg_latency = computed(() => {
   if (current_player.value) {
     return Math.round(current_player.value.avg_latency * 100) / 100;
@@ -76,25 +66,42 @@ const current_player_avg_latency = computed(() => {
 });
 
 const current_player_team_name = computed(() => {
-  return team_to_displayname(current_player_team.value);
+  if (current_player.value) {
+    return team_to_displayname(current_player.value.team);
+  } else {
+    return '';
+  }
 });
-const sorted_teams = computed(() => {
-  const sorted_teams = [...teams.values()];
-  sorted_teams.sort((t1, t2) => {
-    if (isNaN(t1.avg_latency) && isNaN(t2.avg_latency)) {
-      return 0;
-    } else if (isNaN(t1.avg_latency)) {
-      return 1;
-    } else if (isNaN(t2.avg_latency)) {
-      return -1;
-    } else {
-      return t1.avg_latency - t2.avg_latency;
-    }
-  });
-  return sorted_teams;
+const current_player_team = computed(() => {
+  if (current_player.value) {
+    const team = current_player.value.team;
+    return teams.get(team);
+  }
+  return null;
 });
 
-const latency_report_buffer = new Array();
+const current_player_team_players_count = computed(() => {
+  if (current_player_team.value) {
+    return current_player_team.value.players_count;
+  } else {
+    return 0;
+  }
+});
+const current_player_team_clicks = computed(() => {
+  if (current_player_team.value) {
+    return current_player_team.value.total_clicks;
+  } else {
+    return 0;
+  }
+});
+const current_player_team_avg_latency = computed(() => {
+  if (current_player_team.value) {
+    return Math.round(current_player_team.value.avg_latency * 100) / 100;
+  } else {
+    return NaN;
+  }
+});
+
 async function call_click() {
   const player_id = current_player_id.value;
   const variables = {
@@ -102,7 +109,8 @@ async function call_click() {
   };
   console.log(variables);
   let click_mutation;
-  switch (current_player_team.value) {
+
+  switch (current_player.value.team) {
     case 'RUST': {
       click_mutation = 'clickRust';
       break;
@@ -140,6 +148,8 @@ async function call_click() {
     latency_report_buffer.push(duration);
   }
 }
+
+const latency_report_buffer = new Array();
 const report_timer = ref(null);
 function begin_reporting() {
   if (report_timer.value == null) {
@@ -152,6 +162,13 @@ function stop_reporting() {
     report_timer.value = null;
   }
 }
+watch([game_status, current_player], () => {
+  if (current_player.value && game_status.value == 'STARTED') {
+    begin_reporting();
+  } else {
+    stop_reporting();
+  }
+});
 async function report_latency() {
   console.log('report_latency');
   const player_id = current_player_id.value;
@@ -171,7 +188,7 @@ async function report_latency() {
   };
   console.log(variables);
   let report_latency_mutation;
-  switch (current_player_team.value) {
+  switch (current_player.value.team) {
     case 'RUST': {
       report_latency_mutation = 'reportLatencyRust';
       break;
@@ -206,16 +223,16 @@ async function report_latency() {
   }
 }
 onMounted(() => {
-  console.log('onMounted BEGIN');
+  console.log('GameView onMounted BEGIN');
   if (current_player.value && game_status.value == 'STARTED') {
     begin_reporting();
   }
-  console.log('onMounted END');
+  console.log('GameView onMounted END');
 });
 onUnmounted(() => {
-  console.log('onUnmounted BEGIN');
+  console.log('GameView onUnmounted BEGIN');
   stop_reporting();
-  console.log('onUnmounted END');
+  console.log('GameView onUnmounted END');
 });
 </script>
 
@@ -224,7 +241,7 @@ onUnmounted(() => {
     <div class="px-2 md:px-4 mx-auto max-w-screen-lg">
       <div class="flex flex-col m-2 sm:m-4">
         <div class="flex flex-row justify-center items-center gap-2">
-          <team-icon :name="current_player_team" class="h-16"></team-icon>
+          <team-icon :name="current_player_team_id" class="h-16"></team-icon>
           <div class="flex flex-col items-start">
             <div class="text-xl font-black text-wrap [word-break:break-word]">
               {{ current_player_name }}
@@ -241,35 +258,55 @@ onUnmounted(() => {
             </svg>
           </button>
         </div>
-        <div class="flex flex-row justify-center items-center gap-4">
-          <display-player-rank :rank="current_player_rank"></display-player-rank>
-          <display-player-clicks :clicks="current_player_clicks"></display-player-clicks>
-          <display-player-latency
-            :avg_latency="current_player_avg_latency"
-          ></display-player-latency>
+
+        <div class="grid grid-cols-5 w-fit mx-auto">
+          <div class="divider text-base-content/60 font-bold text-sm mb-0 col-span-5">
+            Player stats
+          </div>
+          <div class="col-span-5 grid grid-cols-subgrid justify-items-center gap-4">
+            <display-rank :rank="current_player_rank"></display-rank>
+            <display-clicks :clicks="current_player_clicks" class="col-span-2"></display-clicks>
+            <display-latency
+              :avg_latency="current_player_avg_latency"
+              class="col-span-2"
+            ></display-latency>
+          </div>
+          <div class="divider text-base-content/60 font-bold text-sm mb-0 col-span-5">
+            Team stats
+          </div>
+          <div class="col-span-5 grid grid-cols-subgrid justify-items-center gap-4">
+            <display-player-count
+              :player_count="current_player_team_players_count"
+            ></display-player-count>
+            <display-clicks
+              :clicks="current_player_team_clicks"
+              class="col-span-2"
+            ></display-clicks>
+            <display-latency
+              :avg_latency="current_player_team_avg_latency"
+              class="col-span-2"
+            ></display-latency>
+          </div>
         </div>
       </div>
 
-      <div class="sm:w-fit mx-auto">
+      <div class="max-w-lg mx-auto">
         <button
-          class="btn btn-block uppercase btn-secondary font-black text-5xl py-16 sm:py-20 px-12"
+          class="btn btn-block uppercase btn-secondary font-black text-5xl py-16 sm:py-20"
           :disabled="game_status != 'STARTED'"
           @click="call_click"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-16 fill-current">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            class="h-12 w-12 fill-current"
+          >
             <path
               d="M2 19.63L13.43 8.2L12.72 7.5L14.14 6.07L12 3.89C13.2 2.7 15.09 2.7 16.27 3.89L19.87 7.5L18.45 8.91H21.29L22 9.62L18.45 13.21L17.74 12.5V9.62L16.27 11.04L15.56 10.33L4.13 21.76L2 19.63Z"
             />
           </svg>
-          Smash!!
+          Smash!
         </button>
-      </div>
-
-      <h2 class="text-base-content/40 text-xl font-bold text-center">Team scores</h2>
-      <div class="max-w-4xl mx-auto">
-        <template v-for="team in sorted_teams" :key="team.team_name">
-          <team-score :team="team"></team-score>
-        </template>
       </div>
     </div>
     <c-registration></c-registration>
