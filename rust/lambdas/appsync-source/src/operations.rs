@@ -68,12 +68,15 @@ impl crate::Operation {
 }
 
 impl crate::Operation {
-    pub async fn mutation_register_new_player(name: String) -> Result<Player, AppSyncError> {
+    pub async fn mutation_register_new_player(
+        name: String,
+        secret: String,
+    ) -> Result<Player, AppSyncError> {
         // This is just a marker to ensure an error is thrown if the user did not chose
         // the correct signature for the function. Should be optimized away by the compiler.
         if false {
             return <crate::Operation as crate::DefautOperations>::mutation_register_new_player(
-                name,
+                name, secret,
             )
             .await;
         }
@@ -104,7 +107,7 @@ impl crate::Operation {
             avg_latency: None,
             avg_latency_clicks: None,
         };
-        dynamodb_put_new_player(&new_player)
+        dynamodb_put_new_player(&new_player, secret)
             .await
             .map_err(from_dynamo_error)?;
         Ok(new_player)
@@ -115,16 +118,17 @@ impl crate::Operation {
     pub async fn mutation_update_player_name(
         player_id: ID,
         new_name: String,
+        secret: String,
     ) -> Result<Player, AppSyncError> {
         // This is just a marker to ensure an error is thrown if the user did not chose
         // the correct signature for the function. Should be optimized away by the compiler.
         if false {
             return <crate::Operation as crate::DefautOperations>::mutation_update_player_name(
-                player_id, new_name,
+                player_id, new_name, secret,
             )
             .await;
         }
-        Ok(dynamodb_update_player_name(player_id, new_name)
+        Ok(dynamodb_update_player_name(player_id, new_name, secret)
             .await
             .map_err(from_dynamo_error)?)
     }

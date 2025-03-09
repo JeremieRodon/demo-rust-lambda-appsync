@@ -119,13 +119,20 @@ impl DynamoDBItem for Player {
     }
 }
 
-pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_dynamodb::Error> {
+pub async fn dynamodb_put_new_player(
+    new_player: &Player,
+    secret: String,
+) -> Result<(), aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_put_new_player - new_player={new_player:?}");
+
+    let mut player_item = new_player.to_item();
+    // Add secret
+    player_item.insert("secret".to_owned(), AttributeValue::S(secret));
 
     dynamodb()
         .put_item()
         .table_name(table_name())
-        .set_item(Some(new_player.to_item()))
+        .set_item(Some(player_item))
         .condition_expression(format!("attribute_not_exists({PK})"))
         .return_values(ReturnValue::None)
         .send()
@@ -136,6 +143,7 @@ pub async fn dynamodb_put_new_player(new_player: &Player) -> Result<(), aws_sdk_
 pub async fn dynamodb_update_player_name(
     player_id: ID,
     new_name: String,
+    secret: String,
 ) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_update_player_name - player_id={player_id} new_name={new_name}");
 
@@ -146,7 +154,8 @@ pub async fn dynamodb_update_player_name(
         .update_expression("SET #name = :name")
         .expression_attribute_names("#name", "name")
         .expression_attribute_values(":name", to_attribute_value(new_name).unwrap())
-        .condition_expression(format!("attribute_exists({PK})"))
+        .expression_attribute_values(":secret", AttributeValue::S(secret))
+        .condition_expression(format!("attribute_exists({PK}) AND secret = :secret"))
         .return_values(ReturnValue::AllNew)
         .send()
         .await?

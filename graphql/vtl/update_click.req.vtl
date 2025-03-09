@@ -25,10 +25,11 @@ $util.error("Game is not started", "InvalidGameStatus")
         },
         "expressionValues" : {
             ":zero" : { "N" : 0 },
-            ":one" : { "N" : 1 }
+            ":one" : { "N" : 1 },
+            ":secret" : { "S" : "${ctx.args.secret}" }
         }
     },
     "condition" : {
-        "expression": "attribute_exists(PK)"
+        "expression": "attribute_exists(PK) AND secret = :secret"
     }
 }

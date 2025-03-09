@@ -3,14 +3,18 @@ import CModal from '@/components/CModal.vue';
 import SimpleInput from '@/components/SimpleInput.vue';
 import { alert_appsync_error, alert_success } from '@/modules/utils';
 import { computed, inject, onMounted, ref, watch } from 'vue';
+import { v4 as uuidv4 } from 'uuid';
 
-const registered_player_id = inject('registered_player_id');
-const signed_user_is_admin = inject('signed_user_is_admin');
+const props = defineProps({
+  force_close: Boolean,
+});
+
+const registered_player_obj = inject('registered_player_obj');
 
 const pseudo = ref(null);
 
 const need_registration = computed(() => {
-  return registered_player_id.value == null && !signed_user_is_admin.value;
+  return registered_player_obj.value == null && !props.force_close;
 });
 
 watch(need_registration, () => {
@@ -28,16 +32,18 @@ const client = inject('appsync_client');
 async function handle_register() {
   in_operation.value = true;
   const name = player_name.value;
+  const secret = uuidv4();
   const variables = {
     name,
+    secret,
   };
   console.log(variables);
   try {
     const player_id = (
       await client.graphql({
         query: `
-        mutation RegisterNewPlayer($name: String!) {
-            registerNewPlayer(name: $name) {
+        mutation RegisterNewPlayer($name: String!, $secret: String!) {
+            registerNewPlayer(name: $name, secret: $secret) {
               id
               name
               team
@@ -48,7 +54,10 @@ async function handle_register() {
       })
     ).data.registerNewPlayer.id;
 
-    registered_player_id.value = player_id;
+    registered_player_obj.value = {
+      player_id,
+      secret,
+    };
 
     alert_success(`Welcome ${name}! 🎉`);
   } catch (e) {

@@ -9,6 +9,7 @@ import { alert_appsync_error, team_to_displayname } from '@/modules/utils';
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue';
 import DisplayPlayerCount from '@/components/DisplayPlayerCount.vue';
 
+const registered_player_obj = inject('registered_player_obj');
 const current_player = inject('current_player');
 const game_status = inject('game_status');
 const client = inject('appsync_client');
@@ -16,15 +17,10 @@ const client = inject('appsync_client');
 const sorted_players = inject('sorted_players');
 const teams = inject('teams');
 
+const signed_user_is_admin = inject('signed_user_is_admin');
+const register_modal_force_close = ref(signed_user_is_admin.value);
 const change_name_modal_open = ref(false);
 
-const current_player_id = computed(() => {
-  if (current_player.value) {
-    return current_player.value.id;
-  } else {
-    return null;
-  }
-});
 const current_player_name = computed(() => {
   if (current_player.value) {
     return current_player.value.name;
@@ -40,8 +36,8 @@ const current_player_team_id = computed(() => {
   }
 });
 const current_player_rank = computed(() => {
-  if (current_player_id.value) {
-    const player_id = current_player_id.value;
+  if (registered_player_obj.value) {
+    const player_id = registered_player_obj.value.player_id;
     for (let i = 0; i < sorted_players.value.length; i++) {
       if (sorted_players.value[i].id == player_id) {
         return i + 1;
@@ -120,9 +116,10 @@ const click_mutation = computed(() => {
   return null;
 });
 async function call_click() {
-  const player_id = current_player_id.value;
+  const { player_id, secret } = registered_player_obj.value;
   const variables = {
     player_id,
+    secret,
   };
   console.log(variables);
 
@@ -130,8 +127,8 @@ async function call_click() {
   try {
     await client.graphql({
       query: `
-        mutation Click($player_id: ID!) {
-          ${click_mutation.value}(player_id: $player_id) {
+        mutation Click($player_id: ID!, $secret: String!) {
+          ${click_mutation.value}(player_id: $player_id, secret: $secret) {
               id
               name
               team
@@ -191,7 +188,7 @@ const report_latency_mutation = computed(() => {
 });
 async function report_latency() {
   console.log('report_latency');
-  const player_id = current_player_id.value;
+  const { player_id, secret } = registered_player_obj.value;
   const latencies = latency_report_buffer.splice(0, latency_report_buffer.length);
   if (latencies.length == 0) {
     return;
@@ -205,14 +202,15 @@ async function report_latency() {
   const variables = {
     player_id,
     report,
+    secret,
   };
   console.log(variables);
 
   try {
     await client.graphql({
       query: `
-        mutation ReportLatency($player_id: ID!, $report: LatencyReport!) {
-          ${report_latency_mutation.value}(player_id: $player_id, report: $report) {
+        mutation ReportLatency($player_id: ID!, $report: LatencyReport!, $secret: String!) {
+          ${report_latency_mutation.value}(player_id: $player_id, report: $report, secret: $secret) {
               id
               name
               team
@@ -262,6 +260,13 @@ onUnmounted(() => {
                 d="M19.71,8.04L17.37,10.37L13.62,6.62L15.96,4.29C16.35,3.9 17,3.9 17.37,4.29L19.71,6.63C20.1,7 20.1,7.65 19.71,8.04M3,17.25L13.06,7.18L16.81,10.93L6.75,21H3V17.25M16.62,5.04L15.08,6.58L17.42,8.92L18.96,7.38L16.62,5.04M15.36,11L13,8.64L4,17.66V20H6.34L15.36,11Z"
               />
             </svg>
+          </button>
+          <button
+            v-if="signed_user_is_admin && !current_player"
+            class="btn"
+            @click="register_modal_force_close = !register_modal_force_close"
+          >
+            Admin Register
           </button>
         </div>
 
@@ -315,7 +320,7 @@ onUnmounted(() => {
         </button>
       </div>
     </div>
-    <c-registration></c-registration>
+    <c-registration :force_close="register_modal_force_close"></c-registration>
     <c-change-name v-model="change_name_modal_open"></c-change-name>
   </main>
 </template>

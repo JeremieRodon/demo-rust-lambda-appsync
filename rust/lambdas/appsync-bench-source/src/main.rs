@@ -79,9 +79,11 @@ pub enum MutationField {
     ClickRust,
     ClickJs,
     ClickVtl,
+    ClickPython,
     ReportLatencyRust,
     ReportLatencyJs,
     ReportLatencyVtl,
+    ReportLatencyPython,
 }
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,44 +115,64 @@ trait DefautOperations {
     async fn mutation_reset_game() -> Result<GameStatus, AppSyncError> {
         unimplemented!("Mutation `resetGame` is unimplemented")
     }
-    async fn mutation_register_new_player(_name: String) -> Result<Player, AppSyncError> {
+    async fn mutation_remove_player(_player_id: ID) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `removePlayer` is unimplemented")
+    }
+    async fn mutation_register_new_player(
+        _name: String,
+        _secret: String,
+    ) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `registerNewPlayer` is unimplemented")
     }
     async fn mutation_update_player_name(
         _player_id: ID,
         _new_name: String,
+        _secret: String,
     ) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `updatePlayerName` is unimplemented")
     }
-    async fn mutation_remove_player(_player_id: ID) -> Result<Player, AppSyncError> {
-        unimplemented!("Mutation `removePlayer` is unimplemented")
-    }
-    async fn mutation_click_rust(_player_id: ID) -> Result<Player, AppSyncError> {
+    async fn mutation_click_rust(_player_id: ID, _secret: String) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `clickRust` is unimplemented")
     }
-    async fn mutation_click_js(_player_id: ID) -> Result<Player, AppSyncError> {
+    async fn mutation_click_js(_player_id: ID, _secret: String) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `clickJs` is unimplemented")
     }
-    async fn mutation_click_vtl(_player_id: ID) -> Result<Player, AppSyncError> {
+    async fn mutation_click_vtl(_player_id: ID, _secret: String) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `clickVtl` is unimplemented")
+    }
+    async fn mutation_click_python(
+        _player_id: ID,
+        _secret: String,
+    ) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `clickPython` is unimplemented")
     }
     async fn mutation_report_latency_rust(
         _player_id: ID,
         _report: LatencyReport,
+        _secret: String,
     ) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `reportLatencyRust` is unimplemented")
     }
     async fn mutation_report_latency_js(
         _player_id: ID,
         _report: LatencyReport,
+        _secret: String,
     ) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `reportLatencyJs` is unimplemented")
     }
     async fn mutation_report_latency_vtl(
         _player_id: ID,
         _report: LatencyReport,
+        _secret: String,
     ) -> Result<Player, AppSyncError> {
         unimplemented!("Mutation `reportLatencyVtl` is unimplemented")
+    }
+    async fn mutation_report_latency_python(
+        _player_id: ID,
+        _report: LatencyReport,
+        _secret: String,
+    ) -> Result<Player, AppSyncError> {
+        unimplemented!("Mutation `reportLatencyPython` is unimplemented")
     }
     async fn subscription_updated_player() -> Result<(), AppSyncError> {
         Ok(())
@@ -193,14 +215,16 @@ impl Operation {
                 MutationField::StartGame => Operation::mutation_start_game().await.map(res_to_json),
                 MutationField::StopGame => Operation::mutation_stop_game().await.map(res_to_json),
                 MutationField::ResetGame => Operation::mutation_reset_game().await.map(res_to_json),
-                MutationField::RegisterNewPlayer => {
-                    Operation::mutation_register_new_player(arg_from_json(&mut args, "name")?)
-                        .await
-                        .map(res_to_json)
-                }
+                MutationField::RegisterNewPlayer => Operation::mutation_register_new_player(
+                    arg_from_json(&mut args, "name")?,
+                    arg_from_json(&mut args, "secret")?,
+                )
+                .await
+                .map(res_to_json),
                 MutationField::UpdatePlayerName => Operation::mutation_update_player_name(
                     arg_from_json(&mut args, "player_id")?,
                     arg_from_json(&mut args, "new_name")?,
+                    arg_from_json(&mut args, "secret")?,
                 )
                 .await
                 .map(res_to_json),
@@ -209,36 +233,55 @@ impl Operation {
                         .await
                         .map(res_to_json)
                 }
-                MutationField::ClickRust => {
-                    Operation::mutation_click_rust(arg_from_json(&mut args, "player_id")?)
-                        .await
-                        .map(res_to_json)
-                }
-                MutationField::ClickJs => {
-                    Operation::mutation_click_js(arg_from_json(&mut args, "player_id")?)
-                        .await
-                        .map(res_to_json)
-                }
-                MutationField::ClickVtl => {
-                    Operation::mutation_click_vtl(arg_from_json(&mut args, "player_id")?)
-                        .await
-                        .map(res_to_json)
-                }
+                MutationField::ClickRust => Operation::mutation_click_rust(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "secret")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::ClickJs => Operation::mutation_click_js(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "secret")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::ClickVtl => Operation::mutation_click_vtl(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "secret")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::ClickPython => Operation::mutation_click_python(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "secret")?,
+                )
+                .await
+                .map(res_to_json),
                 MutationField::ReportLatencyRust => Operation::mutation_report_latency_rust(
                     arg_from_json(&mut args, "player_id")?,
                     arg_from_json(&mut args, "report")?,
+                    arg_from_json(&mut args, "secret")?,
                 )
                 .await
                 .map(res_to_json),
                 MutationField::ReportLatencyJs => Operation::mutation_report_latency_js(
                     arg_from_json(&mut args, "player_id")?,
                     arg_from_json(&mut args, "report")?,
+                    arg_from_json(&mut args, "secret")?,
                 )
                 .await
                 .map(res_to_json),
                 MutationField::ReportLatencyVtl => Operation::mutation_report_latency_vtl(
                     arg_from_json(&mut args, "player_id")?,
                     arg_from_json(&mut args, "report")?,
+                    arg_from_json(&mut args, "secret")?,
+                )
+                .await
+                .map(res_to_json),
+                MutationField::ReportLatencyPython => Operation::mutation_report_latency_python(
+                    arg_from_json(&mut args, "player_id")?,
+                    arg_from_json(&mut args, "report")?,
+                    arg_from_json(&mut args, "secret")?,
                 )
                 .await
                 .map(res_to_json),

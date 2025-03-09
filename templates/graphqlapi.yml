@@ -248,6 +248,7 @@ Resources:
             },
             condition: util.transform.toDynamoDBConditionExpression({
               PK: { exist: true },
+              secret: { eq: ctx.args.secret },
             }),
           };
         }
@@ -291,11 +292,13 @@ Resources:
                 PK: { exist: true },
                 avg_latency: { eq: old_avg_latency },
                 avg_latency_clicks: { eq: old_avg_latency_clicks },
+                secret: { eq: ctx.args.secret },
               })
             : util.transform.toDynamoDBConditionExpression({
                 PK: { exist: true },
                 avg_latency: { exist: false },
                 avg_latency_clicks: { exist: false },
+                secret: { eq: ctx.args.secret },
               });
           // Return the UpdateItem req object
           return {

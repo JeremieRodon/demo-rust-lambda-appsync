@@ -21,13 +21,13 @@ const signed_user_is_admin = computed(() => {
 });
 provide('signed_user_is_admin', signed_user_is_admin);
 
-const registered_player_id = ref(null);
-provide('registered_player_id', registered_player_id);
-watch(registered_player_id, () => {
-  if (registered_player_id.value) {
-    window.localStorage.setItem('user_id', registered_player_id.value);
+const registered_player_obj = ref(null);
+provide('registered_player_obj', registered_player_obj);
+watch(registered_player_obj, () => {
+  if (registered_player_obj.value) {
+    window.localStorage.setItem('user_obj', registered_player_obj.value);
   } else {
-    window.localStorage.removeItem('user_id');
+    window.localStorage.removeItem('user_obj');
   }
 });
 
@@ -83,7 +83,7 @@ async function verify_user_signed_in() {
 }
 
 async function verify_registration() {
-  registered_player_id.value = window.localStorage.getItem('user_id');
+  registered_player_obj.value = window.localStorage.getItem('user_obj');
 }
 
 onMounted(async () => {

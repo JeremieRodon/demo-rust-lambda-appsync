@@ -23,12 +23,17 @@ fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
 }
 
 impl crate::Operation {
-    pub async fn mutation_click_rust(player_id: ID) -> Result<Player, AppSyncError> {
+    pub async fn mutation_click_rust(
+        player_id: ID,
+        secret: String,
+    ) -> Result<Player, AppSyncError> {
         // This is just a marker to ensure an error is thrown if the user did not chose
         // the correct signature for the function. Should be optimized away by the compiler.
         if false {
-            return <crate::Operation as crate::DefautOperations>::mutation_click_rust(player_id)
-                .await;
+            return <crate::Operation as crate::DefautOperations>::mutation_click_rust(
+                player_id, secret,
+            )
+            .await;
         }
 
         let game_status = dynamodb_get_game_status()
@@ -38,7 +43,7 @@ impl crate::Operation {
         if game_status != GameStatus::Started {
             return Err(invalid_game_status());
         }
-        Ok(dynamodb_update_player_click(player_id)
+        Ok(dynamodb_update_player_click(player_id, secret)
             .await
             .map_err(from_dynamo_error)?)
     }
@@ -48,12 +53,13 @@ impl crate::Operation {
     pub async fn mutation_report_latency_rust(
         player_id: ID,
         report: LatencyReport,
+        secret: String,
     ) -> Result<Player, AppSyncError> {
         // This is just a marker to ensure an error is thrown if the user did not chose
         // the correct signature for the function. Should be optimized away by the compiler.
         if false {
             return <crate::Operation as crate::DefautOperations>::mutation_report_latency_rust(
-                player_id, report,
+                player_id, report, secret,
             )
             .await;
         }
@@ -94,6 +100,7 @@ impl crate::Operation {
         if new_avg_latency.is_finite() {
             Ok(dynamodb_update_player_latency_stats(
                 player_id,
+                secret,
                 old_avg_latency,
                 old_avg_latency_clicks,
                 new_avg_latency,

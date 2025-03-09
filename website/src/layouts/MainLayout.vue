@@ -55,19 +55,20 @@ function reset_game() {
   });
 }
 
-const registered_player_id = inject('registered_player_id');
+const registered_player_obj = inject('registered_player_obj');
 watch(players, () => {
   control_player_id();
 });
 function control_player_id() {
-  if (registered_player_id.value && !players.has(registered_player_id.value)) {
+  if (registered_player_obj.value && !players.has(registered_player_obj.value.player_id)) {
     // If we have an ID but it is not in the game state,
     // better forget it...
-    registered_player_id.value = null;
+    registered_player_obj.value = null;
   }
 }
+
 const current_player = computed(() => {
-  return players.get(registered_player_id.value);
+  return players.get(registered_player_obj.value?.player_id);
 });
 provide('current_player', current_player);
 

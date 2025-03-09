@@ -87,6 +87,7 @@ pub async fn dynamodb_get_player(player_id: ID) -> Result<Option<Player>, aws_sd
 
 pub async fn dynamodb_update_player_click(
     player_id: ID,
+    secret: String,
 ) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_player_click - player_id={player_id}");
     Ok(dynamodb()
@@ -97,7 +98,8 @@ pub async fn dynamodb_update_player_click(
         .expression_attribute_names("#clicks", "clicks")
         .expression_attribute_values(":zero", AttributeValue::N("0".to_owned()))
         .expression_attribute_values(":one", AttributeValue::N("1".to_owned()))
-        .condition_expression(format!("attribute_exists({PK})"))
+        .expression_attribute_values(":secret", AttributeValue::S(secret))
+        .condition_expression(format!("attribute_exists({PK}) AND secret = :secret"))
         .return_values(ReturnValue::AllNew)
         .send()
         .await?
@@ -108,6 +110,7 @@ pub async fn dynamodb_update_player_click(
 
 pub async fn dynamodb_update_player_latency_stats(
     player_id: ID,
+    secret: String,
     old_avg_latency: Option<f64>,
     old_avg_latency_clicks: Option<i64>,
     new_avg_latency: f64,
@@ -138,13 +141,16 @@ pub async fn dynamodb_update_player_latency_stats(
         .expression_attribute_values(
             ":new_avg_latency_clicks",
             to_attribute_value(new_avg_latency_clicks).unwrap(),
-        );
+        )
+        .expression_attribute_values(":secret", AttributeValue::S(secret))
+        .condition_expression(format!("attribute_exists({PK}) AND secret = :secret"));
 
     let update = match (old_avg_latency, old_avg_latency_clicks) {
         (Some(old_avg_latency), Some(old_avg_latency_clicks)) => update
             .condition_expression(format!(
-                "attribute_exists({PK}) AND #avg_latency = :old_avg_latency \
-            AND #avg_latency_clicks = :old_avg_latency_clicks"
+                "attribute_exists({PK}) AND secret = :secret \
+                AND #avg_latency = :old_avg_latency \
+                AND #avg_latency_clicks = :old_avg_latency_clicks"
             ))
             .expression_attribute_values(
                 ":old_avg_latency",
@@ -155,7 +161,8 @@ pub async fn dynamodb_update_player_latency_stats(
                 to_attribute_value(old_avg_latency_clicks).unwrap(),
             ),
         (None, None) => update.condition_expression(format!(
-            "attribute_exists({PK}) AND attribute_not_exists(#avg_latency) \
+            "attribute_exists({PK}) AND secret = :secret \
+            AND attribute_not_exists(#avg_latency) \
             AND attribute_not_exists(#avg_latency_clicks)"
         )),
         _ => unreachable!(

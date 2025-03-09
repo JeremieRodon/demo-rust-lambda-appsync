@@ -5,14 +5,9 @@ import { alert_appsync_error, alert_success } from '@/modules/utils';
 import { computed, inject, ref, watch } from 'vue';
 const open = defineModel();
 
+const registered_player_obj = inject('registered_player_obj');
 const current_player = inject('current_player');
-const current_player_id = computed(() => {
-  if (current_player.value) {
-    return current_player.value.id;
-  } else {
-    return undefined;
-  }
-});
+
 const current_player_name = computed(() => {
   if (current_player.value) {
     return current_player.value.name;
@@ -40,19 +35,20 @@ const client = inject('appsync_client');
 
 async function change_name() {
   in_operation.value = true;
-  const player_id = current_player_id.value;
+  const { player_id, secret } = registered_player_obj.value;
   const new_name = player_name.value;
   const variables = {
     player_id,
     new_name,
+    secret,
   };
 
   console.log(variables);
   try {
     await client.graphql({
       query: `
-        mutation UpdatePlayerName($player_id:ID!, $new_name: String!) {
-            updatePlayerName(player_id: $player_id, new_name: $new_name) {
+        mutation UpdatePlayerName($player_id:ID!, $new_name: String!, $secret: String!) {
+            updatePlayerName(player_id: $player_id, new_name: $new_name, secret: $secret) {
               id
               name
               team
