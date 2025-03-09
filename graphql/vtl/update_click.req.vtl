@@ -13,23 +13,23 @@
 $util.error("Game is not started", "InvalidGameStatus")
 #end
 {
-    "version" : "2017-02-28",
-    "operation" : "UpdateItem",
-    "key" : {
+    "version": "2017-02-28",
+    "operation": "UpdateItem",
+    "key": {
         "PK": $util.dynamodb.toDynamoDBJson("PLAYER#${ctx.args.player_id}"),
     },
-    "update" : {
-        "expression" : "SET #clicks = if_not_exists(#clicks, :zero) + :one",
-        "expressionNames" : {
-            "#clicks" : "clicks"
+    "update": {
+        "expression": "SET #clicks = if_not_exists(#clicks, :zero) + :one",
+        "expressionNames": {
+            "#clicks": "clicks"
         },
-        "expressionValues" : {
-            ":zero" : { "N" : 0 },
-            ":one" : { "N" : 1 },
-            ":secret" : { "S" : "${ctx.args.secret}" }
+        "expressionValues": {
+            ":zero": { "N": 0 },
+            ":one": { "N": 1 },
+            ":secret": { "S": "${ctx.args.secret}" }
         }
     },
-    "condition" : {
+    "condition": {
         "expression": "attribute_exists(PK) AND secret = :secret"
     }
 }

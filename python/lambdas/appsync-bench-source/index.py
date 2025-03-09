@@ -42,7 +42,7 @@ def get_player(player_id):
     del player['PK']
     return player
 
-def update_click(player_id):
+def update_click(player_id, secret):
     player = backend_table.update_item(
         Key={'PK':f'PLAYER#{player_id}'},
         UpdateExpression="SET #clicks = if_not_exists(#clicks, :zero) + :one",
@@ -51,15 +51,16 @@ def update_click(player_id):
         },
         ExpressionAttributeValues={
             ':zero' : 0,
-            ':one' : 1
+            ':one' : 1,
+            ':secret' : secret
         },
-        ConditionExpression="attribute_exists(PK)",
+        ConditionExpression="attribute_exists(PK) AND secret = :secret",
         ReturnValues='ALL_NEW'
     ).get('Attributes')
     del player['PK']
     return player
 
-def update_latency(player, report):
+def update_latency(player, report, secret):
     player_id = player['id']
     clicks = Decimal(report['clicks'])
     avg_latency = Decimal(report['avg_latency'])
@@ -77,12 +78,13 @@ def update_latency(player, report):
 
     expression_attribute_value={
         ':new_avg_latency' : new_avg_latency,
-        ':new_avg_latency_clicks' : new_avg_latency_clicks
+        ':new_avg_latency_clicks' : new_avg_latency_clicks,
+        ':secret' : secret
     }
     condition = (
-        "attribute_exists(PK) AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks"
+        "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks"
         if has_previous_values
-        else "attribute_exists(PK) AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)"
+        else "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)"
     )
     if has_previous_values:
         expression_attribute_value[':old_avg_latency'] = old_avg_latency
@@ -102,19 +104,19 @@ def update_latency(player, report):
     del player['PK']
     return player
 
-def mutation_click(player_id):
+def mutation_click(player_id, secret):
     game_status = get_game_status()
     if game_status is None or game_status != 'STARTED':
         raise AppSyncError('InvalidGameStatus', 'Game is not started')
-    return update_click(player_id)
+    return update_click(player_id, secret)
 
-def mutation_report_latency(player_id, report):
+def mutation_report_latency(player_id, report, secret):
     game_status = get_game_status()
     if game_status is None or game_status != 'STARTED':
         raise AppSyncError('InvalidGameStatus', 'Game is not started')
     player = get_player(player_id)
 
-    return update_latency(player, report)
+    return update_latency(player, report, secret)
 
 def handle_appsync_event(event):
     args = event['arguments']
@@ -123,9 +125,9 @@ def handle_appsync_event(event):
 
     if op_type == 'Mutation':
         if op == 'clickPython':
-            return mutation_click(args['player_id'])
+            return mutation_click(args['player_id'], args['secret'])
         elif op == 'reportLatencyPython':
-            return mutation_report_latency(args['player_id'], args['report'])
+            return mutation_report_latency(args['player_id'], args['report'], args['secret'])
         else:
             Exception('Unknown operation')
 
