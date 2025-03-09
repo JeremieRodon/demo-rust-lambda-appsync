@@ -118,19 +118,6 @@ function update_player(player) {
 
   // Retrieve the team object
   let team = teams.get(team_name);
-  // If this is the first time we see the team_name,
-  // Init the team object
-  if (team == null) {
-    teams.set(team_name, {
-      team_name,
-      players_count: 0,
-      total_clicks: 0,
-      avg_latency: NaN,
-      avg_latency_clicks: 0,
-    });
-    // We set and then re-get to retrieve the Proxied object (we are in a reactive context)
-    team = teams.get(team_name);
-  }
 
   // If the player was already present, uncount them first
   const existing_player = players.get(player.id);
@@ -281,6 +268,17 @@ function unsubscribe_updates() {
 
 onMounted(async () => {
   console.log('MainLayout onMounted BEGIN');
+  // Init the team object
+  // If this is the first time we see the team_name,
+  for (const team_name of ['RUST', 'PYTHON', 'JS', 'VTL']) {
+    teams.set(team_name, {
+      team_name,
+      players_count: 0,
+      total_clicks: 0,
+      avg_latency: NaN,
+      avg_latency_clicks: 0,
+    });
+  }
   await load_game_state();
   console.log('MainLayout onMounted END');
 });
