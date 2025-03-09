@@ -117,6 +117,7 @@ const click_mutation = computed(() => {
       return 'clickVtl';
     }
   }
+  return null;
 });
 async function call_click() {
   const player_id = current_player_id.value;
@@ -186,6 +187,7 @@ const report_latency_mutation = computed(() => {
       return 'reportLatencyVtl';
     }
   }
+  return null;
 });
 async function report_latency() {
   console.log('report_latency');

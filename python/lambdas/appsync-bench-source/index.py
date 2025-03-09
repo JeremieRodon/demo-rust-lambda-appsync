@@ -1,5 +1,6 @@
 import json
 import os
+from decimal import Decimal
 
 import boto3
 dyndbr = boto3.resource('dynamodb')
@@ -60,12 +61,12 @@ def update_click(player_id):
 
 def update_latency(player, report):
     player_id = player['id']
-    clicks = report['clicks']
-    avg_latency = report['avg_latency']
+    clicks = Decimal(report['clicks'])
+    avg_latency = Decimal(report['avg_latency'])
     
     has_previous_values = player.get('avg_latency') is not None
-    old_avg_latency = player.get('avg_latency', 0.0)
-    old_avg_latency_clicks = player.get('avg_latency_clicks', 0)
+    old_avg_latency = player.get('avg_latency', Decimal(0))
+    old_avg_latency_clicks = player.get('avg_latency_clicks', Decimal(0))
     
     old_total_latency = old_avg_latency * old_avg_latency_clicks
 
