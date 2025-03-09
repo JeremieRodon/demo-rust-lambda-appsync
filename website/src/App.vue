@@ -25,7 +25,7 @@ const registered_player_obj = ref(null);
 provide('registered_player_obj', registered_player_obj);
 watch(registered_player_obj, () => {
   if (registered_player_obj.value) {
-    window.localStorage.setItem('user_obj', registered_player_obj.value);
+    window.localStorage.setItem('user_obj', JSON.stringify(registered_player_obj.value));
   } else {
     window.localStorage.removeItem('user_obj');
   }
@@ -83,7 +83,7 @@ async function verify_user_signed_in() {
 }
 
 async function verify_registration() {
-  registered_player_obj.value = window.localStorage.getItem('user_obj');
+  registered_player_obj.value = JSON.parse(window.localStorage.getItem('user_obj'));
 }
 
 onMounted(async () => {
