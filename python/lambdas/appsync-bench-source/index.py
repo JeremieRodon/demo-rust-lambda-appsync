@@ -59,6 +59,7 @@ def update_click(player_id):
     return player
 
 def update_latency(player, report):
+    player_id = player.id
     clicks = report['clicks']
     avg_latency = report['avg_latency']
     

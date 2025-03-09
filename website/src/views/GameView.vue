@@ -102,38 +102,35 @@ const current_player_team_avg_latency = computed(() => {
   }
 });
 
+const click_mutation = computed(() => {
+  switch (current_player.value.team) {
+    case 'RUST': {
+      return 'clickRust';
+    }
+    case 'PYTHON': {
+      return 'clickPython';
+    }
+    case 'JS': {
+      return 'clickJs';
+    }
+    case 'VTL': {
+      return 'clickVtl';
+    }
+  }
+});
 async function call_click() {
   const player_id = current_player_id.value;
   const variables = {
     player_id,
   };
   console.log(variables);
-  let click_mutation;
 
-  switch (current_player.value.team) {
-    case 'RUST': {
-      click_mutation = 'clickRust';
-      break;
-    }
-    case 'PYTHON': {
-      click_mutation = 'clickPython';
-      break;
-    }
-    case 'JS': {
-      click_mutation = 'clickJs';
-      break;
-    }
-    case 'VTL': {
-      click_mutation = 'clickVtl';
-      break;
-    }
-  }
   const start = Date.now();
   try {
     await client.graphql({
       query: `
         mutation Click($player_id: ID!) {
-          ${click_mutation}(player_id: $player_id) {
+          ${click_mutation.value}(player_id: $player_id) {
               id
               name
               team
@@ -173,6 +170,23 @@ watch([game_status, current_player], () => {
     stop_reporting();
   }
 });
+
+const report_latency_mutation = computed(() => {
+  switch (current_player.value.team) {
+    case 'RUST': {
+      return 'reportLatencyRust';
+    }
+    case 'PYTHON': {
+      return 'reportLatencyPython';
+    }
+    case 'JS': {
+      return 'reportLatencyJs';
+    }
+    case 'VTL': {
+      return 'reportLatencyVtl';
+    }
+  }
+});
 async function report_latency() {
   console.log('report_latency');
   const player_id = current_player_id.value;
@@ -191,30 +205,12 @@ async function report_latency() {
     report,
   };
   console.log(variables);
-  let report_latency_mutation;
-  switch (current_player.value.team) {
-    case 'RUST': {
-      report_latency_mutation = 'reportLatencyRust';
-      break;
-    }
-    case 'PYTHON': {
-      report_latency_mutation = 'reportLatencyPython';
-      break;
-    }
-    case 'JS': {
-      report_latency_mutation = 'reportLatencyJs';
-      break;
-    }
-    case 'VTL': {
-      report_latency_mutation = 'reportLatencyVtl';
-      break;
-    }
-  }
+
   try {
     await client.graphql({
       query: `
         mutation ReportLatency($player_id: ID!, $report: LatencyReport!) {
-          ${report_latency_mutation}(player_id: $player_id, report: $report) {
+          ${report_latency_mutation.value}(player_id: $player_id, report: $report) {
               id
               name
               team
