@@ -1,41 +1,118 @@
 import json
-import time
+import os
 
 import boto3
-s3r = boto3.resource('s3')
-s3c = boto3.client('s3')
+dyndbr = boto3.resource('dynamodb')
+backend_table = dyndbr.Table(os.environ['BACKEND_TABLE_NAME'])
 
-def clean_s3_website(s3_bucket_name):
-    print(f"Cleaning S3 Bucket: {s3_bucket_name}")
-    website_bucket = s3r.Bucket(s3_bucket_name)
+import logging
+log_level = logging.INFO
+# create logger
+logger = logging.getLogger('common')
+logger.setLevel(log_level)
+logger.propagate = False
+# create console handler
+ch = logging.StreamHandler()
+ch.setLevel(log_level)
+# create formatter
+formatter = logging.Formatter('[%(asctime)s][%(threadName)s]%(levelname)s - %(message)s')
+# add formatter to ch
+ch.setFormatter(formatter)
+# add ch to logger
+logger.addHandler(ch)
 
-    # List all the objects and sort them by creation date (first = more recent)
-    all_objects = list(website_bucket.objects.all())
-    all_objects.sort(key=lambda o:o.last_modified, reverse=True)
 
-    # Now, the bucket will contains files that all have the same codebuild-buildarn if they are part of the same deployment
-    # So, with the objects ordered by creation date, the first codebuild-buildarn we encounter is the most recent one
-    codebuild_arn = None
-    for o in all_objects:
-        s3_object = o.Object()
-        # If we don't have a codebuild_arn yet, take the first one
-        if codebuild_arn is None and 'codebuild-buildarn' in s3_object.metadata:
-            codebuild_arn = s3_object.metadata['codebuild-buildarn']
-            print(f"most recent deployment is: codebuild_arn={codebuild_arn}")
-        
-        # If the object does not have the metadata or another value, delete it
-        if 'codebuild-buildarn' not in s3_object.metadata or codebuild_arn != s3_object.metadata['codebuild-buildarn']:
-            print(f"mark for deletion: {s3_object.key}")
-            s3c.put_object_tagging(
-                Bucket=s3_bucket_name,
-                Key=s3_object.key,
-                Tagging={'TagSet': [{'Key': 'need-to-delete', 'Value': 'true'}]}
-            )
+class AppSyncError(Exception):
+    def __init__(self, error_type, error_message):
+        self.error_type = error_type
+        self.error_message = error_message
+
+def get_game_status():
+    return (backend_table.get_item(Key={'PK':'GAME_STATUS'})
+            .get('Item', {})
+            .get('game_status'))
+
+def get_player(player_id):
+    player = (backend_table
+            .get_item(Key={'PK':f'PLAYER#{player_id}'})
+            .get('Item'))
+    if player is None:
+        return None
+    del player['PK']
+    return player
+
+def update_click(player_id):
+    return backend_table.update_item(
+        Key={'PK':f'PLAYER#{player_id}'},
+        UpdateExpression="SET #clicks = if_not_exists(#clicks, :zero) + :one",
+        ExpressionAttributeNames={
+            '#clicks' : 'clicks'
+        },
+        ExpressionAttributeValues={
+            ':zero' : 0,
+            ':one' : 1
+        },
+        ConditionExpression="attribute_exists(PK)",
+        ReturnValues='ALL_NEW'
+    ).get('Attributes')
+
+def update_latency():
+    pass
+
+def mutation_click(player_id):
+    game_status = get_game_status()
+    if game_status is None or game_status != 'STARTED':
+        raise AppSyncError('InvalidGameStatus', 'Game is not started')
+    return update_click(player_id)
+
+def mutation_report_latency(player_id, report):
+    clicks = report['clicks']
+    avg_latency = report['avg_latency']
+    
+    game_status = get_game_status()
+    if game_status is None or game_status != 'STARTED':
+        raise AppSyncError('InvalidGameStatus', 'Game is not started')
+    player = get_player(player_id)
+
+    pass
+
+def handle_appsync_event(event):
+    args = event['arguments']
+    op_type = event['info']['parentTypeName']
+    op = event['info']['fieldName']
+
+    if op_type == 'Mutation':
+        if op == 'clickPython':
+            return mutation_click(args['player_id'])
+        elif op == 'reportLatencyPython':
+            return mutation_report_latency(args['player_id'], args['report'])
+        else:
+            Exception('Unknown operation')
 
 def lambda_handler(event, context):
     print(json.dumps(event, default=str))
-    # Retrieve the bucket name
-    bucket_name = event['Records'][0]['s3']['bucket']['name']
-    print(f"Sleeping 10 seconds to maximise chances the invoking deployment is finished")
-    time.sleep(10)
-    clean_s3_website(bucket_name)
+    results=[]
+    for appsync_event in event:
+        try:
+            res = handle_appsync_event(appsync_event)
+            results.append({
+                'data': res
+            })
+        except AppSyncError as ase:
+            logger.exception(f"[{ase.error_type}]{ase.error_message}")
+            results.append({
+                'data': None,
+                'error': {
+                    'error_type': ase.error_type,
+                    'error_message': ase.error_message
+                }
+            })
+        except Exception as e:
+            logger.exception(str(e))
+            results.append({
+                'data': None,
+                'error': {
+                    'error_message': str(e)
+                }
+            })
+    return results
