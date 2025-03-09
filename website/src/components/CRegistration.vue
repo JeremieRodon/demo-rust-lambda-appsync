@@ -76,7 +76,7 @@ onMounted(() => {
           tabindex="1"
           ref="pseudo"
           name="pseudo"
-          placeholder="The GOAT 🐐"
+          placeholder="Your player name..."
           autocomplete="off"
           :rules="[
             (pseudo) => (pseudo && pseudo.length >= 3) || 'Must be at least 3 chars',

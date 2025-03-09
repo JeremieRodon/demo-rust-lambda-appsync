@@ -5,7 +5,11 @@ const props = defineProps({
   avg_latency: Number,
 });
 const avg_latency_rounded = computed(() => {
-  return Math.round(props.avg_latency * 100) / 100;
+  if (isNaN(props.avg_latency)) {
+    return '-';
+  } else {
+    return Math.round(props.avg_latency * 100) / 100;
+  }
 });
 </script>
 
