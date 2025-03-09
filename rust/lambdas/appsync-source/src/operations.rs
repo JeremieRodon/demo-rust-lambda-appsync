@@ -80,7 +80,7 @@ impl crate::Operation {
         let mut teams_player_count = dynamodb_query_teams_player_count()
             .await
             .map_err(from_dynamo_error)?;
-        let team = if teams_player_count.len() < Team::TEAM_COUNT {
+        let team = if teams_player_count.len() < Team::COUNT {
             // If all teams are not yet used, choose one of the unused
             let mut all_teams = HashSet::from(Team::all());
             while let Some((team, _)) = teams_player_count.pop() {

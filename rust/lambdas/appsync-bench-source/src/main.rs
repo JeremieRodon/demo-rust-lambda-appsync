@@ -15,13 +15,26 @@ pub enum GameStatus {
     Stopped,
     Reset,
 }
+impl GameStatus {
+    pub const COUNT: usize = 3;
+    pub fn all() -> [Self; Self::COUNT] {
+        [Self::Started, Self::Stopped, Self::Reset]
+    }
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Team {
     Rust,
+    Python,
     Js,
     Vtl,
+}
+impl Team {
+    pub const COUNT: usize = 4;
+    pub fn all() -> [Self; Self::COUNT] {
+        [Self::Rust, Self::Python, Self::Js, Self::Vtl]
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

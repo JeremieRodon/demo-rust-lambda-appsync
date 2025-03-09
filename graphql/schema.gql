@@ -66,6 +66,7 @@ enum GameStatus {
 
 enum Team {
   RUST
+  PYTHON
   JS
   VTL
 }
