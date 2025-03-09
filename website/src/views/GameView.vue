@@ -115,6 +115,10 @@ async function call_click() {
       click_mutation = 'clickRust';
       break;
     }
+    case 'PYTHON': {
+      click_mutation = 'clickPython';
+      break;
+    }
     case 'JS': {
       click_mutation = 'clickJs';
       break;
@@ -191,6 +195,10 @@ async function report_latency() {
   switch (current_player.value.team) {
     case 'RUST': {
       report_latency_mutation = 'reportLatencyRust';
+      break;
+    }
+    case 'PYTHON': {
+      report_latency_mutation = 'reportLatencyPython';
       break;
     }
     case 'JS': {

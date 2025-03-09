@@ -73,6 +73,8 @@ export function alert_appsync_error(appsync_error_response, message, timeout = 5
 export function team_to_displayname(team) {
   if (team == 'RUST') {
     return 'Team Rust';
+  } else if (team == 'PYTHON') {
+    return 'Team Python';
   } else if (team == 'JS') {
     return 'Team Javascript';
   } else if (team == 'VTL') {

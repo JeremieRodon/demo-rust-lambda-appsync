@@ -27,14 +27,19 @@ impl GameStatus {
 #[serde(rename_all = "UPPERCASE")]
 pub enum Team {
     Rust,
-    Python,
+    // Python,
     Js,
     Vtl,
 }
 impl Team {
-    pub const COUNT: usize = 4;
+    pub const COUNT: usize = 3; //4;
     pub fn all() -> [Self; Self::COUNT] {
-        [Self::Rust, Self::Python, Self::Js, Self::Vtl]
+        [
+            Self::Rust,
+            //Self::Python,
+            Self::Js,
+            Self::Vtl,
+        ]
     }
 }
 
