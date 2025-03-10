@@ -40,17 +40,13 @@
     "expressionNames": { "#avg_latency": "avg_latency", "#avg_latency_clicks": "avg_latency_clicks" },
     "expressionValues": {
         ":old_avg_latency": $util.parseJson($util.dynamodb.toDynamoDBJson($old_avg_latency)),
-        ":old_avg_latency_clicks": $util.parseJson( $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks)),
-        ":secret": $util.parseJson($util.dynamodb.toDynamoDBJson($ctx.args.secret))
+        ":old_avg_latency_clicks": $util.parseJson( $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks))
     }
 })
 #else
 #set( $condition = {
     "expression": "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)",
-    "expressionNames": { "#avg_latency": "avg_latency", "#avg_latency_clicks": "avg_latency_clicks" },
-    "expressionValues": {
-        ":secret": $util.parseJson($util.dynamodb.toDynamoDBJson($ctx.args.secret))
-    }
+    "expressionNames": { "#avg_latency": "avg_latency", "#avg_latency_clicks": "avg_latency_clicks" }
 })
 #end
 
@@ -68,7 +64,8 @@
         },
         "expressionValues": {
             ":new_avg_latency": $util.dynamodb.toDynamoDBJson($new_avg_latency),
-            ":new_avg_latency_clicks": $util.dynamodb.toDynamoDBJson($new_avg_latency_clicks)
+            ":new_avg_latency_clicks": $util.dynamodb.toDynamoDBJson($new_avg_latency_clicks),
+            ":secret": $util.dynamodb.toDynamoDBJson($ctx.args.secret)
         }
     },
     "condition": $util.toJson($condition)

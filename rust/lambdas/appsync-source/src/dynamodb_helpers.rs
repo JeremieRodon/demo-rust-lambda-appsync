@@ -43,6 +43,20 @@ impl DynamoDBItem for GameStatus {
     }
 }
 
+async fn dynamodb_list_player_items() -> Result<Vec<DynamoItem>, aws_sdk_dynamodb::Error> {
+    let scan_req_builder = dynamodb()
+        .scan()
+        .table_name(table_name())
+        .filter_expression("#type = :player_type")
+        .expression_attribute_names("#type", TYPE)
+        .expression_attribute_values(
+            ":player_type",
+            AttributeValue::S(Player::get_type().to_owned()),
+        );
+
+    Ok(dynamodb_perform_scan(scan_req_builder).await?)
+}
+
 pub async fn dynamodb_reset_game() -> Result<(), aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_reset_game");
     // Start by changing the state to Reset
@@ -54,21 +68,22 @@ pub async fn dynamodb_reset_game() -> Result<(), aws_sdk_dynamodb::Error> {
     // in a somewhat incorrect state: the status is technically `Reset` but players still have scores.
     // This is just a demo, so we will accept that fact.
 
-    // List players
-    let GameState { players, .. } = dynamodb_query_game_state().await?;
+    // List players as DynamoItem
+    // Because we want to retrieve the `secret` field and put it back with the PutItem
+    let player_items = dynamodb_list_player_items().await?;
 
     // Create the iterator of BatchWriteRequest that will PUT every players without clicks/latency
-    let batch_write_requests = players
+    let batch_write_requests = player_items
         .into_iter()
-        .map(|mut player| {
-            player.clicks = None;
-            player.avg_latency = None;
-            player.avg_latency_clicks = None;
+        .map(|mut player_item| {
+            player_item.remove("clicks");
+            player_item.remove("avg_latency");
+            player_item.remove("avg_latency_clicks");
             // Create the BatchWriteRequest
             WriteRequest::builder()
                 .put_request(
                     PutRequestBuilder::default()
-                        .set_item(Some(player.to_item()))
+                        .set_item(Some(player_item))
                         .build()
                         .expect("item is set"),
                 )
