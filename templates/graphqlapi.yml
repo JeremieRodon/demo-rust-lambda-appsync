@@ -291,8 +291,8 @@ Resources:
             ? {
               expression: "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks",
               expressionValues: {
-                ":old_avg_latency": $util.dynamodb.toDynamoDBJson($old_avg_latency),
-                ":old_avg_latency_clicks": $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks),
+                ":old_avg_latency": util.dynamodb.toDynamoDB(old_avg_latency),
+                ":old_avg_latency_clicks": util.dynamodb.toDynamoDB(old_avg_latency_clicks),
               },
             }
             : {
