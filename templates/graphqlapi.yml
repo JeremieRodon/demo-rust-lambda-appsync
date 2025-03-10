@@ -244,11 +244,13 @@ Resources:
               expressionValues: {
                 ":zero": util.dynamodb.toDynamoDB(0),
                 ":one": util.dynamodb.toDynamoDB(1),
-                ":secret": util.dynamodb.toDynamoDB(ctx.args.secret),
               },
             },
             condition: {
-              expression: "attribute_exists(PK) AND secret = :secret"
+              expression: "attribute_exists(PK) AND secret = :secret",
+              expressionValues: {
+                ":secret": util.dynamodb.toDynamoDB(ctx.args.secret),
+              },
             },
           };
         }
@@ -287,18 +289,21 @@ Resources:
           // Update avg_latency
           const new_avg_latency = new_total_latency / new_avg_latency_clicks;
           // the Condition check depends on wheither or not we had previous values
-          const condition = has_previous_values
-            ? {
-              expression: "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks",
-              expressionValues: {
-                ":old_avg_latency": util.dynamodb.toDynamoDB(old_avg_latency),
-                ":old_avg_latency_clicks": util.dynamodb.toDynamoDB(old_avg_latency_clicks),
-              },
-            }
-            : {
-              expression: "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)",
-            };
-
+          const condition_expression = has_previous_values
+            ? "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks"
+            : "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)";
+          const condition_expression_names = {
+            "#avg_latency": "avg_latency",
+            "#avg_latency_clicks": "avg_latency_clicks",
+          };
+          const condition_expression_values = {
+            ":secret": util.dynamodb.toDynamoDB(ctx.args.secret),
+          }
+          if (has_previous_values) {
+            condition_expression_values[":old_avg_latency"] = util.dynamodb.toDynamoDB(old_avg_latency);
+            condition_expression_values[":old_avg_latency_clicks"] = util.dynamodb.toDynamoDB(old_avg_latency_clicks);
+          }
+          
           // Return the UpdateItem req object
           return {
             operation: "UpdateItem",
@@ -317,7 +322,11 @@ Resources:
                 ),
               },
             },
-            condition,
+            condition: {
+              expression: condition_expression,
+              expressionNames: condition_expression_names,
+              expressionValues: condition_expression_values,
+            },
           };
         }
         export function response(ctx) {
