@@ -290,15 +290,14 @@ Resources:
           const condition = has_previous_values
             ? {
               expression: "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks",
-              "expressionValues": {
-                ":old_avg_latency": $util.parseJson($util.dynamodb.toDynamoDBJson($old_avg_latency)),
-                ":old_avg_latency_clicks": $util.parseJson( $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks))
-              }
+              expressionValues: {
+                ":old_avg_latency": $util.dynamodb.toDynamoDBJson($old_avg_latency),
+                ":old_avg_latency_clicks": $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks),
+              },
             }
             : {
               expression: "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)",
             };
-          condition.expressionNames = { "#avg_latency": "avg_latency", "#avg_latency_clicks": "avg_latency_clicks" };
 
           // Return the UpdateItem req object
           return {
