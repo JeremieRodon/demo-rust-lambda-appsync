@@ -246,10 +246,10 @@ Resources:
                 ":one": util.dynamodb.toDynamoDB(1),
               },
             },
-            condition: util.transform.toDynamoDBConditionExpression({
+            condition: JSON.parse(util.transform.toDynamoDBConditionExpression({
               PK: { exist: true },
               secret: { eq: ctx.args.secret },
-            }),
+            })),
           };
         }
         export function response(ctx) {
@@ -318,7 +318,7 @@ Resources:
                 ),
               },
             },
-            condition,
+            condition: JSON.parse(condition),
           };
         }
         export function response(ctx) {
