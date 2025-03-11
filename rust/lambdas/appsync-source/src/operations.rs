@@ -15,10 +15,10 @@ fn player_not_found() -> AppSyncError {
 }
 fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
     let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(&e);
-    AppSyncError {
-        error_type: meta.code().unwrap_or("Unknown").to_owned(),
-        error_message: meta.message().unwrap_or_default().to_owned(),
-    }
+    AppSyncError::new(
+        meta.code().unwrap_or("Unknown"),
+        meta.message().unwrap_or_default(),
+    )
 }
 
 // impl crate::Operation {

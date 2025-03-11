@@ -275,7 +275,10 @@ impl Operation {
         let return_type = &self.return_type;
         quote! {
             async fn #fct_name(#(#params,)*) -> ::core::result::Result<#return_type, ::lambda_appsync::AppSyncError> {
-                unimplemented!(#unimplemented_message)
+                Err(::lambda_appsync::AppSyncError::new(
+                    "Unimplemented",
+                    #unimplemented_message,
+                ))
             }
         }
     }

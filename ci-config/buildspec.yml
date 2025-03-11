@@ -35,6 +35,7 @@ phases:
       - |
         RUST_LIB_PATH=./rust/libs
         RUST_LAMBDA_PATH=./rust/lambdas
+        GRAPHQL_SCHEMA_FILE=./graphql/schema.gql
       # We verify if we changed Rust version since the last build by comparing the current version
       # with the one stored in cache (if any). If we have changed Rust version, we clean every
       # build artifacts. As we don't want to change the Cargo.lock that fixes packages versions,
@@ -83,6 +84,21 @@ phases:
             echo $current_md5 > rust_target_md5sum/$LAMBDA
           fi
         done
+        # This is an AppSync project
+        # We need to verify if the schema.gql file has changed because
+        # the lambda-appsync crate is using it to generate all the boiler-plate
+        # of the Lambdas
+        current_gql_md5=$(md5sum $GRAPHQL_SCHEMA_FILE | cut -f1 -d" ")
+        if ! previous_gql_md5=$(cat rust_target_md5sum/gql_md5 2>/dev/null) || [ "$previous_gql_md5" != "$current_gql_md5" ] ; then
+          echo previous_gql_md5=$previous_gql_md5 current_gql_md5=$current_gql_md5 =\> Clean all lambda using the appsync_lambda_main! macro
+          for LAMBDA in $(ls $RUST_LAMBDA_PATH) ; do
+            echo Control appsync_lambda_main! macro usage for $RUST_LAMBDA_PATH/$LAMBDA
+            if ! grep 'appsync_lambda_main!' $RUST_LAMBDA_PATH/$LAMBDA/src/main.rs ; then
+              PACKAGES_TO_CLEAN+=([$LAMBDA]=1)
+            fi
+          done
+          echo $current_gql_md5 > rust_target_md5sum/gql_md5
+        fi
         # Only execute this section if there is a previous Cargo.lock
         if [ -f Cargo.lock.old ] ; then
           echo "Cargo.lock from the previous build found, restoring it"
