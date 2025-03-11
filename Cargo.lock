@@ -1062,6 +1062,7 @@ checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
 [[package]]
 name = "lambda-appsync"
 version = "0.1.0"
+source = "git+https://github.com/JeremieRodon/lambda-appsync.git?branch=wip#86f2b6d481ac742be5168e00a7c7d8a34f4b84f1"
 dependencies = [
  "aws-config",
  "env_logger",
@@ -1078,6 +1079,7 @@ dependencies = [
 [[package]]
 name = "lambda-appsync-proc"
 version = "0.1.0"
+source = "git+https://github.com/JeremieRodon/lambda-appsync.git?branch=wip#86f2b6d481ac742be5168e00a7c7d8a34f4b84f1"
 dependencies = [
  "graphql-parser",
  "proc-macro2",

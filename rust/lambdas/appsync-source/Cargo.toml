@@ -7,7 +7,7 @@ authors.workspace = true
 
 [dependencies]
 dynamodb_utils = { path = "../../libs/dynamodb_utils" }
-lambda-appsync = { path = "../../libs/lambda-appsync" }
+lambda-appsync = { workspace = true }
 aws-sdk-dynamodb = { workspace = true }
 
 serde = { workspace = true }
