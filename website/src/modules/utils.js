@@ -58,9 +58,9 @@ export function alert_appsync_error(appsync_error_response, message, timeout = 5
     let error_type;
     if (error.errorType) {
       if (error.errorType.startsWith('Lambda:')) {
-        error_type = `[${error.errorType.substring(7)}]`;
+        error_type = `[${error.errorType.substring(7)}] `;
       } else {
-        error_type = `[${error.errorType}]`;
+        error_type = `[${error.errorType}] `;
       }
     } else {
       error_type = '';
