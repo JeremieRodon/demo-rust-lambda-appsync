@@ -30,7 +30,7 @@ Globals:
 Mappings:
   AppSyncResolvers:
     Rust:
-      Query: [gameState]
+      Query: [gameState, gameState3]
       Mutation:
         [
           startGame,

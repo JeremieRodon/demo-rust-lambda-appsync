@@ -8,7 +8,7 @@ type Query {
   gameState: GameState!
     @aws_cognito_user_pools(cognito_groups: ["Admins"])
     @aws_api_key
-  gameState2: GameState!
+  gameState3: GameState!
     @aws_cognito_user_pools(cognito_groups: ["Admins"])
     @aws_api_key
 }
