@@ -267,18 +267,36 @@ impl Operation {
     }
     fn default_op(&self, kind: OperationKind) -> proc_macro2::TokenStream {
         let fct_name = self.name.to_prefixed_fct_ident(kind.fct_prefix());
-        let unimplemented_message = format!(
-            "{kind} `{}` is unimplemented",
-            self.name.to_case(CaseType::CamelCase)
-        );
         let params = self.args.iter().map(UnusedParam);
-        let return_type = &self.return_type;
+        let return_type = match kind {
+            OperationKind::Query | OperationKind::Mutation => {
+                let return_type = &self.return_type;
+                quote! {#return_type}
+            }
+            OperationKind::Subscription => quote! {
+               ()
+            },
+        };
+        let default_body = match kind {
+            OperationKind::Query | OperationKind::Mutation => {
+                let unimplemented_message = format!(
+                    "{kind} `{}` is unimplemented",
+                    self.name.to_case(CaseType::CamelCase)
+                );
+                quote! {
+                    ::core::result::Result::Err(::lambda_appsync::AppSyncError::new(
+                        "Unimplemented",
+                        #unimplemented_message,
+                    ))
+                }
+            }
+            OperationKind::Subscription => quote! {
+                ::core::result::Result::Ok(())
+            },
+        };
         quote! {
             async fn #fct_name(#(#params,)*) -> ::core::result::Result<#return_type, ::lambda_appsync::AppSyncError> {
-                Err(::lambda_appsync::AppSyncError::new(
-                    "Unimplemented",
-                    #unimplemented_message,
-                ))
+                #default_body
             }
         }
     }
