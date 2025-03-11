@@ -12,21 +12,11 @@ license = "MIT"
 [workspace.dependencies]
 lambda-appsync = { git = "https://github.com/JeremieRodon/lambda-appsync.git", branch = "wip" }
 
-aws_lambda_events = "0.15"
-lambda_runtime = "0.12"
-lambda_http = "0.12"
-aws-config = { version = "1.5", features = ["behavior-version-latest"] }
 aws-sdk-dynamodb = { version = "1.59" }
-aws-smithy-types = { version = "1.2" }
+serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
 
 tokio = { version = "1", features = ["macros"] }
-
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
 
 thiserror = "1.0"
 log = "0.4"
-env_logger = "0.11"
-
-uuid = { version = "1.11", features = ["v4"] }
