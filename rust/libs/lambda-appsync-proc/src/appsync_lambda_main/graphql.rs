@@ -213,18 +213,42 @@ impl ToTokens for Enum {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let enum_name = self.name.to_type_ident();
         let count = proc_macro2::Literal::usize_unsuffixed(self.variants.len());
-        let variants1 = self.variants.iter().map(|n| n.to_type_ident());
-        let variants2 = variants1.clone();
+        let variant_orig_iter = self.variants.iter().map(|n| n.orig()).collect::<Vec<_>>();
+        let variants = self
+            .variants
+            .iter()
+            .map(|n| n.to_type_ident())
+            .collect::<Vec<_>>();
+        let error_message = format!("`{{}}` is an invalid value for enum {}", enum_name);
         tokens.extend(quote! {
             #[derive(Debug, Clone, Copy, ::lambda_appsync::serde::Serialize, ::lambda_appsync::serde::Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-            #[serde(rename_all = "UPPERCASE")]
             pub enum #enum_name {
-                #(#variants1,)*
+                #(#[serde(rename = #variant_orig_iter)]#variants,)*
             }
             impl #enum_name {
                 pub const COUNT: usize = #count;
                 pub fn all() -> [Self; Self::COUNT] {
-                    [#(Self::#variants2,)*]
+                    [#(Self::#variants,)*]
+                }
+            }
+            impl ::core::fmt::Display for #enum_name {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    match self {
+                        #(Self::#variants => write!(f, #variant_orig_iter),)*
+                    }
+                }
+            }
+            impl ::core::str::FromStr for #enum_name {
+                type Err = ::lambda_appsync::AppSyncError;
+
+                fn from_str(s: &str) -> ::core::result::Result<Self, Self::Err> {
+                    match s {
+                        #(#variant_orig_iter => ::core::result::Result::Ok(Self::#variants),)*
+                        _ => ::core::result::Result::Err(::lambda_appsync::AppSyncError::new(
+                            "InvalidStr",
+                            format!(#error_message, s),
+                        ))
+                    }
                 }
             }
         });
