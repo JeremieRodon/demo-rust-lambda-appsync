@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use appsync_utils::ID;
 use aws_sdk_dynamodb::types::{AttributeValue, ReturnValue};
-use dynamodb_utils::{table_name, DynamoDBItem, DynamoItem, PK};
-use lambda_commons_utils::log;
+use dynamodb_utils::{DynamoDBItem, DynamoItem, PK, table_name};
+
+use lambda_appsync::{ID, log};
 use serde_dynamo::to_attribute_value;
 
-use crate::{dynamodb, GameStatus, Player};
+use crate::{GameStatus, Player, dynamodb};
 
 impl GameStatus {
     const PK_TYPE: &'static str = "GAME_STATUS";

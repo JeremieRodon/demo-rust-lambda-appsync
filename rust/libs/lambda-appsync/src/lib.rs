@@ -1,12 +1,22 @@
 mod id;
 use std::{collections::HashMap, ops::BitOr};
 
-use serde_json::{self, Value};
+use serde_json::Value;
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
 pub use id::ID;
+pub use lambda_appsync_proc::{appsync_lambda_main, appsync_operation};
+
+// Re-export crates that are mandatory for the proc_macro to succeed
+pub use aws_config;
+pub use env_logger;
+pub use lambda_runtime;
+pub use log;
+pub use serde;
+pub use serde_json;
+pub use tokio;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]

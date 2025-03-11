@@ -1,13 +1,14 @@
 [package]
 name = "appsync-bench-source"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
 
 
 [dependencies]
-lambda_commons_utils = { path = "../../libs/lambda_commons_utils" }
 dynamodb_utils = { path = "../../libs/dynamodb_utils" }
-appsync_utils = { path = "../../libs/appsync_utils" }
+lambda-appsync = { path = "../../libs/lambda-appsync" }
 aws-sdk-dynamodb = { workspace = true }
 
 serde = { workspace = true }

@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
-use appsync_utils::ID;
 use aws_sdk_dynamodb::types::{
-    builders::PutRequestBuilder, AttributeValue, ReturnValue, WriteRequest,
+    AttributeValue, ReturnValue, WriteRequest, builders::PutRequestBuilder,
 };
 use dynamodb_utils::{
-    dynamodb_batch_write, dynamodb_delete_item, dynamodb_perform_scan, table_name, DynamoDBItem,
-    DynamoItem, PK, TYPE,
+    DynamoDBItem, DynamoItem, PK, TYPE, dynamodb_batch_write, dynamodb_delete_item,
+    dynamodb_perform_scan, table_name,
 };
-use lambda_commons_utils::log;
+use lambda_appsync::{ID, log};
+
 use serde_dynamo::{from_attribute_value, to_attribute_value};
 
-use crate::{dynamodb, GameState, GameStatus, Player, Team};
+use crate::{GameState, GameStatus, Player, Team, dynamodb};
 
 impl GameStatus {
     const PK_TYPE: &'static str = "GAME_STATUS";
@@ -191,8 +191,8 @@ pub async fn dynamodb_delete_player(
     )
 }
 
-pub async fn dynamodb_query_teams_player_count(
-) -> Result<Vec<(Team, usize)>, aws_sdk_dynamodb::Error> {
+pub async fn dynamodb_query_teams_player_count()
+-> Result<Vec<(Team, usize)>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_query_teams_player_count");
 
     let scan_req_builder = dynamodb()
