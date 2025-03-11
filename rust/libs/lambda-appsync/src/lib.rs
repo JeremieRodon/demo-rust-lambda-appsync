@@ -1,4 +1,6 @@
+mod aws_scalars;
 mod id;
+
 use std::{collections::HashMap, ops::BitOr};
 
 use serde_json::Value;
@@ -6,6 +8,12 @@ use serde_json::Value;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
 
+pub use aws_scalars::{
+    datetime::{AWSDate, AWSDateTime, AWSTime, AWSTimestamp},
+    email::AWSEmail,
+    phone::AWSPhone,
+    url::AWSUrl,
+};
 pub use id::ID;
 pub use lambda_appsync_proc::{appsync_lambda_main, appsync_operation};
 

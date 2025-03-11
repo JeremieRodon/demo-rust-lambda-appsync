@@ -13,7 +13,12 @@ enum Scalar {
     AWSEmail,
     AWSPhone,
     AWSTimestamp,
+    AWSDate,
+    AWSTime,
+    AWSDateTime,
     AWSJSON,
+    AWSURL,
+    AWSIPAddress,
 }
 impl TryFrom<&str> for Scalar {
     type Error = ();
@@ -28,7 +33,12 @@ impl TryFrom<&str> for Scalar {
             "AWSEmail" => Ok(Self::AWSEmail),
             "AWSPhone" => Ok(Self::AWSPhone),
             "AWSTimestamp" => Ok(Self::AWSTimestamp),
+            "AWSDate" => Ok(Self::AWSDate),
+            "AWSTime" => Ok(Self::AWSTime),
+            "AWSDateTime" => Ok(Self::AWSDateTime),
             "AWSJSON" => Ok(Self::AWSJSON),
+            "AWSURL" => Ok(Self::AWSURL),
+            "AWSIPAddress" => Ok(Self::AWSIPAddress),
             _ => Err(()),
         }
     }
@@ -41,10 +51,15 @@ impl ToTokens for Scalar {
             Scalar::Int => quote! {i64},
             Scalar::Float => quote! {f64},
             Scalar::Boolean => quote! {bool},
-            Scalar::AWSJSON => quote! {::lambda_appsync::serde_json::Value},
             Scalar::AWSEmail => quote! {::lambda_appsync::AWSEmail},
             Scalar::AWSPhone => quote! {::lambda_appsync::AWSPhone},
             Scalar::AWSTimestamp => quote! {::lambda_appsync::AWSTimestamp},
+            Scalar::AWSDate => quote! {::lambda_appsync::AWSDate},
+            Scalar::AWSTime => quote! {::lambda_appsync::AWSTime},
+            Scalar::AWSDateTime => quote! {::lambda_appsync::AWSDateTime},
+            Scalar::AWSJSON => quote! {::lambda_appsync::serde_json::Value},
+            Scalar::AWSURL => quote! {::lambda_appsync::AWSUrl},
+            Scalar::AWSIPAddress => quote! {::core::net::IpAddr},
         })
     }
 }
