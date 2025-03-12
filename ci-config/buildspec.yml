@@ -91,9 +91,15 @@ phases:
         current_gql_md5=$(md5sum $GRAPHQL_SCHEMA_FILE | cut -f1 -d" ")
         if ! previous_gql_md5=$(cat rust_target_md5sum/gql_md5 2>/dev/null) || [ "$previous_gql_md5" != "$current_gql_md5" ] ; then
           echo previous_gql_md5=$previous_gql_md5 current_gql_md5=$current_gql_md5 =\> Clean all lambda using the appsync_lambda_main! macro
+          for LIB in $(ls $RUST_LIB_PATH) ; do
+            echo Control appsync_lambda_main! macro usage for $RUST_LIB_PATH/$LIB
+            if grep -r 'appsync_lambda_main!' $RUST_LIB_PATH/$LIB/ ; then
+              PACKAGES_TO_CLEAN+=([$LIB]=1)
+            fi
+          done
           for LAMBDA in $(ls $RUST_LAMBDA_PATH) ; do
             echo Control appsync_lambda_main! macro usage for $RUST_LAMBDA_PATH/$LAMBDA
-            if grep 'appsync_lambda_main!' $RUST_LAMBDA_PATH/$LAMBDA/src/main.rs ; then
+            if grep -r 'appsync_lambda_main!' $RUST_LAMBDA_PATH/$LAMBDA/ ; then
               PACKAGES_TO_CLEAN+=([$LAMBDA]=1)
             fi
           done
