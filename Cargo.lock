@@ -1417,9 +1417,10 @@ dependencies = [
 [[package]]
 name = "lambda-appsync"
 version = "0.0.1"
-source = "git+https://github.com/JeremieRodon/lambda-appsync.git?branch=wip#214de375597ddb4412a53f89ca5756f9ade739e0"
+source = "git+https://github.com/JeremieRodon/lambda-appsync.git?branch=wip#101f193559a60347944615faa0835b62701dfd47"
 dependencies = [
  "aws-config",
+ "aws-smithy-types",
  "env_logger",
  "lambda-appsync-proc",
  "lambda_runtime",
@@ -1434,7 +1435,7 @@ dependencies = [
 [[package]]
 name = "lambda-appsync-proc"
 version = "0.0.1"
-source = "git+https://github.com/JeremieRodon/lambda-appsync.git?branch=wip#214de375597ddb4412a53f89ca5756f9ade739e0"
+source = "git+https://github.com/JeremieRodon/lambda-appsync.git?branch=wip#101f193559a60347944615faa0835b62701dfd47"
 dependencies = [
  "graphql-parser",
  "proc-macro2",

@@ -214,12 +214,7 @@ pub async fn dynamodb_query_teams_player_count()
     });
     let mut counts = HashMap::new();
     for team in teams {
-        counts
-            .entry(team)
-            .and_modify(|c| {
-                *c += 1;
-            })
-            .or_insert(1usize);
+        *counts.entry(team).or_insert(0usize) += 1;
     }
 
     Ok(counts
