@@ -6,17 +6,17 @@ use crate::{
     },
 };
 
-use lambda_appsync::{AppSyncError, ID, appsync_operation};
+use lambda_appsync::{AppsyncError, ID, appsync_operation};
 
-fn player_not_found() -> AppSyncError {
-    AppSyncError::new("PlayerNotFound", "Player does not exist")
+fn player_not_found() -> AppsyncError {
+    AppsyncError::new("PlayerNotFound", "Player does not exist")
 }
-fn invalid_game_status() -> AppSyncError {
-    AppSyncError::new("InvalidGameStatus", "Game is not started")
+fn invalid_game_status() -> AppsyncError {
+    AppsyncError::new("InvalidGameStatus", "Game is not started")
 }
-fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
+fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppsyncError {
     let meta = aws_sdk_dynamodb::error::ProvideErrorMetadata::meta(&e);
-    AppSyncError {
+    AppsyncError {
         error_type: meta.code().unwrap_or("Unknown").to_owned(),
         error_message: meta.message().unwrap_or_default().to_owned(),
     }
@@ -26,7 +26,7 @@ fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
 //     pub async fn mutation_click_rust(
 //         player_id: ID,
 //         secret: String,
-//     ) -> Result<Player, AppSyncError> {
+//     ) -> Result<Player, AppsyncError> {
 //         // This is just a marker to ensure an error is thrown if the user did not chose
 //         // the correct signature for the function. Should be optimized away by the compiler.
 //         if false {
@@ -49,7 +49,7 @@ fn from_dynamo_error(e: aws_sdk_dynamodb::Error) -> AppSyncError {
 // }
 // This macro replace the whole function by the code commented above
 #[appsync_operation(mutation(clickRust))]
-pub async fn click(player_id: ID, secret: String) -> Result<Player, AppSyncError> {
+pub async fn click(player_id: ID, secret: String) -> Result<Player, AppsyncError> {
     let game_status = dynamodb_get_game_status()
         .await
         .map_err(from_dynamo_error)?
@@ -67,7 +67,7 @@ pub async fn click(player_id: ID, secret: String) -> Result<Player, AppSyncError
 //         player_id: ID,
 //         report: LatencyReport,
 //         secret: String,
-//     ) -> Result<Player, AppSyncError> {
+//     ) -> Result<Player, AppsyncError> {
 //         // This is just a marker to ensure an error is thrown if the user did not chose
 //         // the correct signature for the function. Should be optimized away by the compiler.
 //         if false {
@@ -132,7 +132,7 @@ pub async fn report_latency(
     player_id: ID,
     report: LatencyReport,
     secret: String,
-) -> Result<Player, AppSyncError> {
+) -> Result<Player, AppsyncError> {
     let player_req = lambda_appsync::tokio::spawn(dynamodb_get_player(player_id));
     let game_status = dynamodb_get_game_status()
         .await
