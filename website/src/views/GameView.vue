@@ -304,7 +304,7 @@ onUnmounted(() => {
       <div class="max-w-lg mx-auto">
         <button
           class="btn btn-block uppercase btn-secondary font-black text-5xl py-16 sm:py-20"
-          :disabled="game_status != 'STARTED'"
+          :disabled="game_status != 'STARTED' || !current_player"
           @click="call_click"
         >
           <svg

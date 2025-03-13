@@ -18,3 +18,6 @@ target/
 
 # Direnv
 /.direnv
+
+# Config file of the simulation script
+simulate_players.config.txt

@@ -198,10 +198,10 @@ function subscribe_updates() {
     .subscribe({
       next: ({ data }) => {
         console.log(data);
-        if (data.updatedPlayer) {
-          const player = data.updatedPlayer;
-          update_player(player);
-        }
+        // if (data.updatedPlayer) {
+        //   const player = data.updatedPlayer;
+        //   update_player(player);
+        // }
       },
       error: (error) => console.error(error),
     });

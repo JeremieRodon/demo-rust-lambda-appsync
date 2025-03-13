@@ -1,1 +1,0 @@
-java -Djava.library.path=~/Downloads/dynamodb_local/DynamoDBLocal_lib -jar ~/Downloads/dynamodb_local/DynamoDBLocal.jar -sharedDb -inMemory

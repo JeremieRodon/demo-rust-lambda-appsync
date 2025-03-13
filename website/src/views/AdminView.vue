@@ -15,6 +15,9 @@ const email = computed(() => {
 });
 const in_operation = ref(null);
 const game_status = inject('game_status');
+const game_duration = ref(20);
+
+const sorted_players = inject('sorted_players');
 
 async function alter_game_state(mutation_name) {
   in_operation.value = true;
@@ -37,14 +40,47 @@ async function alter_game_state(mutation_name) {
   }
 }
 
-async function start_game() {
+async function start_game(duration) {
   await alter_game_state('startGame');
+  if (duration != null) {
+    setTimeout(stop_game, duration * 1000);
+  }
 }
 async function stop_game() {
   await alter_game_state('stopGame');
 }
 async function reset_game() {
   await alter_game_state('resetGame');
+}
+async function delete_all_players() {
+  in_operation.value = true;
+  const player_count = sorted_players.value.length;
+
+  const mutations = sorted_players.value
+    .map((player, i) => {
+      return `player${i}: removePlayer(player_id:"${player.id}"){id name team clicks avg_latency avg_latency_clicks}`;
+    })
+    .join('\n');
+
+  console.log(mutations);
+
+  try {
+    if (player_count == 0) {
+      return;
+    }
+    await client.graphql({
+      query: `
+        mutation RemoveAllPlayer {
+          ${mutations}
+        }
+      `,
+    });
+    alert_success(`${player_count} player(s) removed`);
+  } catch (e) {
+    alert_appsync_error(e, `Could not remove all players in the game 😭`);
+  } finally {
+    in_operation.value = false;
+  }
 }
 </script>
 
@@ -60,18 +96,30 @@ async function reset_game() {
       </div>
     </div>
     <div class="flex flex-col sm:flex-row gap-4">
-      <button
-        class="btn btn-primary uppercase"
-        tabindex="-1"
-        @click="start_game"
-        :disabled="in_operation || game_status != 'RESET'"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-3/4 fill-current">
-          <title>play</title>
-          <path d="M8,5.14V19.14L19,12.14L8,5.14Z" />
-        </svg>
-        Start Game
-      </button>
+      <div class="flex flex-col">
+        <fieldset class="fieldset sm:order-2">
+          <legend class="fieldset-legend">Game duration</legend>
+          <select class="select select-xs" v-model="game_duration">
+            <option :value="null">Unlimited</option>
+            <option :value="20">20 seconds</option>
+            <option :value="30">30 seconds</option>
+            <option :value="40">40 seconds</option>
+            <option :value="60">60 seconds</option>
+          </select>
+        </fieldset>
+        <button
+          class="btn btn-primary uppercase"
+          tabindex="-1"
+          @click="start_game(game_duration)"
+          :disabled="in_operation || game_status != 'RESET'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-3/4 fill-current">
+            <title>play</title>
+            <path d="M8,5.14V19.14L19,12.14L8,5.14Z" />
+          </svg>
+          Start game
+        </button>
+      </div>
       <button
         class="btn btn-primary uppercase"
         tabindex="-1"
@@ -97,6 +145,19 @@ async function reset_game() {
         Reset Game
       </button>
     </div>
+    <button
+      class="btn btn-error m-8 font-bold uppercase"
+      tabindex="-1"
+      @click="delete_all_players"
+      :disabled="in_operation || game_status != 'RESET'"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-3/4 fill-current" viewBox="0 0 24 24">
+        <path
+          d="M17 4V6H3V4H6.5L7.5 3H12.5L13.5 4H17M4 19V7H16V19C16 20.1 15.1 21 14 21H6C4.9 21 4 20.1 4 19M19 15H21V17H19V15M19 7H21V13H19V7Z"
+        />
+      </svg>
+      Remove all players
+    </button>
     <button class="btn btn-ghost my-auto font-bold uppercase" tabindex="-1" @click="signOut">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3/4 fill-current" viewBox="0 0 24 24">
         <path

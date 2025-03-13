@@ -1,6 +1,5 @@
 [workspace]
-members = ["rust/lambdas/*", "rust/libs/*"]
-exclude = ["rust/libs/lambda_event_utils"]
+members = ["rust/lambdas/*", "rust/libs/*", "utils/simulate_players"]
 resolver = "2"
 
 [workspace.package]
