@@ -10,6 +10,7 @@ use std::{
 
 fn e_to_s(e: impl Error) -> String {
     log::error!("{e}");
+    log::error!("{e:?}");
     e.to_string()
 }
 

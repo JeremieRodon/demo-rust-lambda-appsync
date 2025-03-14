@@ -71,7 +71,7 @@ const current_player_team_name = computed(() => {
 const current_player_team = computed(() => {
   if (current_player.value) {
     const team = current_player.value.team;
-    return teams.get(team);
+    return teams.value.get(team);
   }
   return null;
 });

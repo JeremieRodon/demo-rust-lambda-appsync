@@ -2,17 +2,107 @@
 import { RouterView } from 'vue-router';
 import ThemeSwitch from '@/components/ThemeSwitch.vue';
 import LayoutLinks from '@/components/LayoutLinks.vue';
-import { computed, inject, onMounted, onUnmounted, provide, reactive, ref, watch } from 'vue';
+import { computed, inject, onMounted, onUnmounted, provide, ref, watch } from 'vue';
 import { alert_appsync_error, alert_error } from '@/modules/utils';
 
 const client = inject('appsync_client');
 
+const commit_buffer_interval = { v: null };
+const players_change_buffer = new Map();
+const players_remove_buffer = new Set();
+function commit_players_buffer() {
+  console.log('commit_players_buffer');
+  if (
+    players_change_buffer.size == 0 &&
+    players_remove_buffer.size == 0 &&
+    commit_buffer_interval.v != null
+  ) {
+    stop_updates();
+  }
+  if (players_change_buffer.size > 0) {
+    const players_map = players.value;
+    players_change_buffer.forEach((player) => {
+      players_map.set(player.id, player);
+    });
+    players.value = players_map;
+    players_change_buffer.clear();
+  }
+  if (players_remove_buffer.size > 0) {
+    const players_map = players.value;
+    players_remove_buffer.forEach((player_id) => {
+      players_map.delete(player_id);
+    });
+    players.value = players_map;
+    players_remove_buffer.clear();
+  }
+}
+function start_updates() {
+  console.log('start_updates');
+  console.log(commit_buffer_interval);
+  if (commit_buffer_interval.v == null) {
+    console.log('actually_start_updates');
+    commit_players_buffer();
+    commit_buffer_interval.v = setInterval(commit_players_buffer, 500);
+  }
+}
+function stop_updates() {
+  console.log('stop_updates');
+  console.log(commit_buffer_interval);
+  if (commit_buffer_interval.v != null) {
+    console.log('actually_stop_updates');
+    clearInterval(commit_buffer_interval.v);
+    commit_buffer_interval.v = null;
+  }
+}
+
 const game_status = ref(null);
 provide('game_status', game_status);
-const teams = reactive(new Map());
+function update_game_status(status) {
+  console.log('update_game_status');
+  game_status.value = status;
+  if (status == 'RESET') {
+    reset_game();
+  }
+}
+
+const teams = computed(() => {
+  console.log('COMPUTED teams');
+  const teams = new Map();
+  for (const team_name of ['RUST', 'PYTHON', 'JS', 'VTL']) {
+    teams.set(team_name, {
+      team_name,
+      players_count: 0,
+      total_clicks: 0,
+      total_latency: 0.0,
+      avg_latency_clicks: 0,
+    });
+  }
+  for (const player of players.value.values()) {
+    console.log(player);
+    const team_name = player.team;
+    const total_clicks = player.clicks ? player.clicks : 0;
+    const avg_latency_clicks = player.avg_latency_clicks ? player.avg_latency_clicks : 0;
+    const total_latency = player.avg_latency ? player.avg_latency * avg_latency_clicks : 0.0;
+
+    const team_obj = teams.get(team_name);
+    team_obj.players_count += 1;
+    team_obj.total_clicks += total_clicks;
+    team_obj.total_latency += total_latency;
+    team_obj.avg_latency_clicks += avg_latency_clicks;
+  }
+  for (const team_obj of teams.values()) {
+    console.log(team_obj);
+    const avg_latency = team_obj.total_latency / team_obj.avg_latency_clicks;
+    team_obj.avg_latency = avg_latency;
+    delete team_obj.total_latency;
+  }
+  return teams;
+});
 provide('teams', teams);
+
 const sorted_teams = computed(() => {
-  const sorted_teams = [...teams.values()];
+  console.log('COMPUTED sorted_teams');
+  const sorted_teams = [...teams.value.values()];
   sorted_teams.sort((t1, t2) => {
     if (isNaN(t1.avg_latency) && isNaN(t2.avg_latency)) {
       return 0;
@@ -28,31 +118,23 @@ const sorted_teams = computed(() => {
 });
 provide('sorted_teams', sorted_teams);
 
-const players = reactive(new Map());
+const players = ref(new Map());
 const sorted_players = computed(() => {
-  const sorted_players = [...players.values()];
+  console.log('COMPUTED sorted_players');
+  const sorted_players = [...players.value.values()];
   sorted_players.sort((p1, p2) => p2.clicks - p1.clicks);
   return sorted_players;
 });
 provide('sorted_players', sorted_players);
 
-function update_game_status(status) {
-  game_status.value = status;
-  if (status == 'RESET') {
-    reset_game();
-  }
-}
 function reset_game() {
-  players.forEach((p) => {
+  const players_map = players.value;
+  players_map.forEach((p) => {
     p.clicks = 0;
     p.avg_latency = NaN;
     p.avg_latency_clicks = 0;
   });
-  teams.forEach((t) => {
-    t.total_clicks = 0;
-    t.avg_latency = NaN;
-    t.avg_latency_clicks = 0;
-  });
+  players.value = new Map(players_map);
 }
 
 const registered_player_obj = inject('registered_player_obj');
@@ -60,7 +142,7 @@ watch(players, () => {
   control_player_id();
 });
 function control_player_id() {
-  if (registered_player_obj.value && !players.has(registered_player_obj.value.player_id)) {
+  if (registered_player_obj.value && !players.value.has(registered_player_obj.value.player_id)) {
     // If we have an ID but it is not in the game state,
     // better forget it...
     registered_player_obj.value = null;
@@ -68,73 +150,9 @@ function control_player_id() {
 }
 
 const current_player = computed(() => {
-  return players.get(registered_player_obj.value?.player_id);
+  return players.value.get(registered_player_obj.value?.player_id);
 });
 provide('current_player', current_player);
-
-function uncount_player(team, player) {
-  if (player.clicks > 0) {
-    // Remove the share of click of the previous version
-    team.total_clicks -= player.clicks;
-    // Compute the avg_latency_clicks without the player
-    const old_avg_latency_clicks = team.avg_latency_clicks - player.avg_latency_clicks;
-    // Compute the total_added_latency without the player
-    const old_total_added_latency =
-      team.avg_latency * team.avg_latency_clicks - player.avg_latency * player.avg_latency_clicks;
-
-    // Update the team fields
-    team.avg_latency = old_avg_latency_clicks
-      ? old_total_added_latency / old_avg_latency_clicks
-      : NaN;
-    team.avg_latency_clicks = old_avg_latency_clicks;
-  }
-}
-function count_player(team, player) {
-  if (player.clicks > 0) {
-    // Add players clicks to the total
-    team.total_clicks += player.clicks;
-    // Compute the player's avg_latency_clicks
-    const avg_latency_clicks = team.avg_latency_clicks + player.avg_latency_clicks;
-    // Compute the total_added_latency with the player
-    const total_added_latency =
-      (team.avg_latency_clicks ? team.avg_latency * team.avg_latency_clicks : 0.0) +
-      player.avg_latency * player.avg_latency_clicks;
-
-    // Update the team fields
-    team.avg_latency = total_added_latency / avg_latency_clicks;
-    team.avg_latency_clicks = avg_latency_clicks;
-  }
-}
-function remove_player(player_id) {
-  const player = players.get(player_id);
-  if (players.delete(player_id)) {
-    const team = teams.get(player.team);
-    uncount_player(team, player);
-    team.players_count -= 1;
-  }
-}
-function update_player(player) {
-  const team_name = player.team;
-
-  // Retrieve the team object
-  let team = teams.get(team_name);
-
-  // If the player was already present, uncount them first
-  const existing_player = players.get(player.id);
-  if (existing_player != null) {
-    uncount_player(team, existing_player);
-  } else {
-    // If the player was not present, it is the first time we saw them
-    // So add them to the team list
-    team.players_count += 1;
-  }
-
-  // Then count them in
-  count_player(team, player);
-
-  // And finally update the players Map
-  players.set(player.id, player);
-}
 
 async function load_game_state() {
   try {
@@ -159,10 +177,11 @@ async function load_game_state() {
     ).data.gameState;
     console.log(gs);
     update_game_status(gs.status);
+    const players_map = new Map();
     gs.players.forEach((p) => {
-      update_player(p);
+      players_map.set(p.id, p);
     });
-    control_player_id();
+    players.value = players_map;
   } catch (e) {
     alert_appsync_error(e, 'Could not retrieve the Game state 😭');
   }
@@ -198,10 +217,9 @@ function subscribe_updates() {
     .subscribe({
       next: ({ data }) => {
         console.log(data);
-        // if (data.updatedPlayer) {
-        //   const player = data.updatedPlayer;
-        //   update_player(player);
-        // }
+        const player = data.updatedPlayer;
+        players_change_buffer.set(player.id, player);
+        start_updates();
       },
       error: (error) => console.error(error),
     });
@@ -226,7 +244,8 @@ function subscribe_updates() {
         console.log(data);
         if (data.removedPlayer) {
           const player = data.removedPlayer;
-          remove_player(player.id);
+          players_remove_buffer.add(player.id);
+          start_updates();
         }
       },
       error: (error) => console.error(error),
@@ -268,23 +287,14 @@ function unsubscribe_updates() {
 
 onMounted(async () => {
   console.log('MainLayout onMounted BEGIN');
-  // Init the team object
-  // If this is the first time we see the team_name,
-  for (const team_name of ['RUST', 'PYTHON', 'JS', 'VTL']) {
-    teams.set(team_name, {
-      team_name,
-      players_count: 0,
-      total_clicks: 0,
-      avg_latency: NaN,
-      avg_latency_clicks: 0,
-    });
-  }
   await load_game_state();
+  start_updates();
   console.log('MainLayout onMounted END');
 });
 onUnmounted(() => {
   console.log('MainLayout onUnmounted BEGIN');
   unsubscribe_updates();
+  stop_updates();
   console.log('MainLayout onUnmounted END');
 });
 </script>
