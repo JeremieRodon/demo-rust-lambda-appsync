@@ -121,7 +121,7 @@ Core Components:
        --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND
    ```
 
-4. Wait for the pipeline to complete (~15 minutes)
+4. Wait for the pipeline to complete (~30 minutes)
 
 ### Deployment (detailed)
 
@@ -181,7 +181,7 @@ from the link or from your newly forked repository if you prefer.
 
 ![Step 8](images/get-started-8.png)
 
-At this point, everything will roll on its own, the full deployment should take ~15 minutes, largely due to the quite long first compilation of Rust lambdas and the very long deployment time of CloudFront.
+At this point, everything will roll on its own, the full deployment should take ~30 minutes, largely due to the quite long first compilation of Rust lambdas and the very long deployment time of CloudFront.
 
 If you wish to follow what is happening, keep the CloudFormation tab open in your browser and open another one on the CodePipeline console.
 
