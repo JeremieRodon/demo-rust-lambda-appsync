@@ -1,0 +1,10 @@
+#set($game_status = $ctx.prev.result.game_status)
+#if (!$game_status || $game_status != "STARTED")
+$util.error("Game is not started", "InvalidGameStatus")
+#end
+{
+    "operation": "GetItem",
+    "key": {
+        "PK": $util.dynamodb.toDynamoDBJson("PLAYER#${ctx.args.player_id}"),
+    }
+}

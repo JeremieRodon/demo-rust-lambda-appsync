@@ -1,0 +1,686 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform:
+  - AWS::LanguageExtensions
+  - AWS::Serverless-2016-10-31
+Description: The backend REST API for the website
+
+Parameters:
+  ProjectName:
+    Type: String
+  CognitoUserPoolId:
+    Type: String
+    Description: The Cognito UserPool ID
+  CognitoUserPoolClientId:
+    Type: String
+    Description: ID of the User Pool Client to authorize
+
+Globals:
+  Function:
+    Runtime: provided.al2023
+    MemorySize: 128
+    Timeout: 30
+    Handler: rust.handler
+    Architectures:
+      - arm64
+    Environment:
+      Variables:
+        BACKEND_TABLE_NAME: !Ref BackendTable
+        RUST_LOG: debug,hyper=info,h2=info,tracing=info,aws_config=info,aws_smithy_runtime=info,aws_smithy_runtime_api=info,rustls=info
+
+Mappings:
+  AppSyncResolvers:
+    Rust:
+      Query: [players, gameStatus]
+      Mutation:
+        [
+          startGame,
+          stopGame,
+          resetGame,
+          registerNewPlayer,
+          updatePlayerName,
+          removePlayer,
+        ]
+      Subscription: [updatedPlayer, removedPlayer, updatedGameStatus]
+
+Resources:
+  ############################################
+  # Generic (Rust) AppSync GraphQL Resolvers #
+  ############################################
+  "Fn::ForEach::RustOps":
+    - OpType
+    - [Query, Mutation, Subscription]
+    - "Fn::ForEach::Op":
+        - Op
+        - !FindInMap [AppSyncResolvers, Rust, !Ref OpType]
+        - "Rust${OpType}${Op}Resolver":
+            Type: AWS::AppSync::Resolver
+            DependsOn: GraphQLApiSchema
+            Properties:
+              ApiId: !GetAtt GraphQLApi.ApiId
+              DataSourceName: !GetAtt LambdaDatasource.Name
+              Kind: UNIT
+              TypeName: !Ref OpType
+              FieldName: !Ref Op
+              MaxBatchSize: 100
+              MetricsConfig: ENABLED
+  ##################################
+  # Rust AppSync GraphQL Resolvers #
+  ##################################
+  "Fn::ForEach::RustBench":
+    - Op
+    - [clickRust, reportLatencyRust]
+    - "RustMutation${Op}Resolver":
+        Type: AWS::AppSync::Resolver
+        DependsOn: GraphQLApiSchema
+        Properties:
+          ApiId: !GetAtt GraphQLApi.ApiId
+          DataSourceName: !GetAtt RustBenchLambdaDatasource.Name
+          Kind: UNIT
+          TypeName: Mutation
+          FieldName: !Ref Op
+          MaxBatchSize: 100
+          MetricsConfig: ENABLED
+
+  ####################################
+  # Python AppSync GraphQL Resolvers #
+  ####################################
+  "Fn::ForEach::PythonBench":
+    - Op
+    - [clickPython, reportLatencyPython]
+    - "RustMutation${Op}Resolver":
+        Type: AWS::AppSync::Resolver
+        DependsOn: GraphQLApiSchema
+        Properties:
+          ApiId: !GetAtt GraphQLApi.ApiId
+          DataSourceName: !GetAtt PythonBenchLambdaDatasource.Name
+          Kind: UNIT
+          TypeName: Mutation
+          FieldName: !Ref Op
+          MaxBatchSize: 100
+          MetricsConfig: ENABLED
+  #################################
+  # VTL AppSync GraphQL Resolvers #
+  #################################
+  VtlGetGameStatusFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: VtlGetGameStatus
+      FunctionVersion: 2018-05-29
+      RequestMappingTemplateS3Location: ../graphql/vtl/get_game_status.req.vtl
+      ResponseMappingTemplate: $util.toJson($ctx.result)
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  VtlGetPlayerFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: VtlGetPlayer
+      FunctionVersion: 2018-05-29
+      RequestMappingTemplateS3Location: ../graphql/vtl/get_player.req.vtl
+      ResponseMappingTemplate: $util.toJson($ctx.result)
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  VtlUpdateClickFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: VtlUpdateClick
+      FunctionVersion: 2018-05-29
+      RequestMappingTemplateS3Location: ../graphql/vtl/update_click.req.vtl
+      ResponseMappingTemplate: $util.toJson($ctx.result)
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  VtlUpdateLatencyFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: VtlUpdateLatency
+      FunctionVersion: 2018-05-29
+      RequestMappingTemplateS3Location: ../graphql/vtl/update_latency.req.vtl
+      ResponseMappingTemplate: $util.toJson($ctx.result)
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  VtlMutationclickVtlResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Kind: PIPELINE
+      RequestMappingTemplate: "{}"
+      ResponseMappingTemplate: $util.toJson($ctx.result)
+      TypeName: Mutation
+      FieldName: clickVtl
+      MetricsConfig: ENABLED
+      PipelineConfig:
+        Functions:
+          - !GetAtt VtlGetGameStatusFunction.FunctionId
+          - !GetAtt VtlUpdateClickFunction.FunctionId
+  VtlMutationreportLatencyVtlResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Kind: PIPELINE
+      RequestMappingTemplate: "{}"
+      ResponseMappingTemplate: $util.toJson($ctx.result)
+      TypeName: Mutation
+      FieldName: reportLatencyVtl
+      MetricsConfig: ENABLED
+      PipelineConfig:
+        Functions:
+          - !GetAtt VtlGetGameStatusFunction.FunctionId
+          - !GetAtt VtlGetPlayerFunction.FunctionId
+          - !GetAtt VtlUpdateLatencyFunction.FunctionId
+
+  ################################
+  # JS AppSync GraphQL Resolvers #
+  ################################
+  JsGetGameStatusFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsGetGameStatus
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        import { util } from "@aws-appsync/utils";
+        export function request(ctx) {
+          return {
+            operation: "GetItem",
+            key: util.dynamodb.toMapValues({ PK: "GAME_STATUS" }),
+          };
+        }
+        export function response(ctx) {
+          return ctx.result;
+        }
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  JsGetPlayerFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsGetPlayer
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        import { util } from "@aws-appsync/utils";
+        export function request(ctx) {
+          // Verify the gamestatus
+          const game_status = ctx.prev.result;
+          if (!game_status || game_status.game_status != "STARTED") {
+            util.error("Game is not started", "InvalidGameStatus");
+          }
+          // Then return the GetItem req object
+          return {
+            operation: "GetItem",
+            key: util.dynamodb.toMapValues({ PK: `PLAYER#${ctx.args.player_id}` }),
+          };
+        }
+        export function response(ctx) {
+          return ctx.result;
+        }
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  JsUpdateClickFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsUpdateClick
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        import { util } from "@aws-appsync/utils";
+        export function request(ctx) {
+          // Verify the gamestatus
+          const game_status = ctx.prev.result;
+          if (!game_status || game_status.game_status != "STARTED") {
+            util.error("Game is not started", "InvalidGameStatus");
+          }
+          // Then return the UpdateItem req object
+          return {
+            operation: "UpdateItem",
+            key: util.dynamodb.toMapValues({ PK: `PLAYER#${ctx.args.player_id}` }),
+            update: {
+              expression: "SET #clicks = if_not_exists(#clicks, :zero) + :one",
+              expressionNames: { "#clicks": "clicks" },
+              expressionValues: {
+                ":zero": util.dynamodb.toDynamoDB(0),
+                ":one": util.dynamodb.toDynamoDB(1),
+              },
+            },
+            condition: {
+              expression: "attribute_exists(PK) AND secret = :secret",
+              expressionValues: {
+                ":secret": util.dynamodb.toDynamoDB(ctx.args.secret),
+              },
+            },
+          };
+        }
+        export function response(ctx) {
+          return ctx.result;
+        }
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  JsUpdateLatencyFunction:
+    Type: AWS::AppSync::FunctionConfiguration
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Name: JsUpdateLatency
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        import { util } from "@aws-appsync/utils";
+        export function request(ctx) {
+          // Extract the report values
+          const { clicks, avg_latency } = ctx.args.report;
+          // ctx.prev.result is the "Player" from the previous pipeline function
+          const player = ctx.prev.result;
+          const old_avg_latency = player.avg_latency;
+          const old_avg_latency_clicks = player.avg_latency_clicks;
+          // The player may or may not have a previous latency report
+          const has_previous_values = old_avg_latency_clicks != null;
+          // Compute the previous total latency, or use 0 if none present
+          const old_total_latency = has_previous_values
+            ? old_avg_latency * old_avg_latency_clicks
+            : 0.0;
+          // Update the total latency
+          const new_total_latency = old_total_latency + avg_latency * clicks;
+          // Update avg_latency_clicks
+          const new_avg_latency_clicks =
+            (has_previous_values ? old_avg_latency_clicks : 0) + clicks;
+          // Update avg_latency
+          const new_avg_latency = new_total_latency / new_avg_latency_clicks;
+          // the Condition check depends on wheither or not we had previous values
+          const condition_expression = has_previous_values
+            ? "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks"
+            : "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)";
+          const condition_expression_names = {
+            "#avg_latency": "avg_latency",
+            "#avg_latency_clicks": "avg_latency_clicks",
+          };
+          const condition_expression_values = {
+            ":secret": util.dynamodb.toDynamoDB(ctx.args.secret),
+          }
+          if (has_previous_values) {
+            condition_expression_values[":old_avg_latency"] = util.dynamodb.toDynamoDB(old_avg_latency);
+            condition_expression_values[":old_avg_latency_clicks"] = util.dynamodb.toDynamoDB(old_avg_latency_clicks);
+          }
+
+          // Return the UpdateItem req object
+          return {
+            operation: "UpdateItem",
+            key: util.dynamodb.toMapValues({ PK: `PLAYER#${ctx.args.player_id}` }),
+            update: {
+              expression:
+                "SET #avg_latency = :new_avg_latency, #avg_latency_clicks = :new_avg_latency_clicks",
+              expressionNames: {
+                "#avg_latency": "avg_latency",
+                "#avg_latency_clicks": "avg_latency_clicks",
+              },
+              expressionValues: {
+                ":new_avg_latency": util.dynamodb.toDynamoDB(new_avg_latency),
+                ":new_avg_latency_clicks": util.dynamodb.toDynamoDB(
+                  new_avg_latency_clicks
+                ),
+              },
+            },
+            condition: {
+              expression: condition_expression,
+              expressionNames: condition_expression_names,
+              expressionValues: condition_expression_values,
+            },
+          };
+        }
+        export function response(ctx) {
+          // Update with response logic
+          return ctx.result;
+        }
+      DataSourceName: !GetAtt BackendTableDatasource.Name
+  JsMutationclickJsResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Kind: PIPELINE
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        export function request(ctx) {
+          return {};
+        }
+        export function response(ctx) {
+          return ctx.prev.result;
+        }
+      TypeName: Mutation
+      FieldName: clickJs
+      MetricsConfig: ENABLED
+      PipelineConfig:
+        Functions:
+          - !GetAtt JsGetGameStatusFunction.FunctionId
+          - !GetAtt JsUpdateClickFunction.FunctionId
+  JsMutationreportLatencyJsResolver:
+    Type: AWS::AppSync::Resolver
+    DependsOn: GraphQLApiSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Kind: PIPELINE
+      Runtime:
+        Name: APPSYNC_JS
+        RuntimeVersion: 1.0.0
+      Code: |
+        export function request(ctx) {
+          return {};
+        }
+        export function response(ctx) {
+          return ctx.prev.result;
+        }
+      TypeName: Mutation
+      FieldName: reportLatencyJs
+      MetricsConfig: ENABLED
+      PipelineConfig:
+        Functions:
+          - !GetAtt JsGetGameStatusFunction.FunctionId
+          - !GetAtt JsGetPlayerFunction.FunctionId
+          - !GetAtt JsUpdateLatencyFunction.FunctionId
+
+  #################
+  # Backend table #
+  #################
+  BackendTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${ProjectName}-backend
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: True
+
+  ###############
+  # GraphQL API #
+  ###############
+  GraphQLApiPublicKey:
+    Type: AWS::AppSync::ApiKey
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Description: Public Access Key to the API embedded in the front website
+      Expires: 1744236000 # 2025-04-09 22:00:00 TZ=Paris
+  GraphQLApiSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      DefinitionS3Location: ../graphql/schema.gql
+  GraphQLApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      ApiType: GRAPHQL
+      Name: !Ref ProjectName
+      Visibility: GLOBAL
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      UserPoolConfig:
+        UserPoolId: !Ref CognitoUserPoolId
+        AwsRegion: !Ref AWS::Region
+        AppIdClientRegex: !Sub ^${CognitoUserPoolClientId}$
+        DefaultAction: ALLOW
+      AdditionalAuthenticationProviders:
+        - AuthenticationType: API_KEY
+      IntrospectionConfig: ENABLED
+      QueryDepthLimit: 0 # Unlimited
+      ResolverCountLimit: 10000 # 10000
+      XrayEnabled: true
+      LogConfig:
+        CloudWatchLogsRoleArn: !GetAtt GraphQLApiLogRole.Arn
+        ExcludeVerboseContent: true
+        FieldLogLevel: INFO
+  GraphQLApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/appsync/apis/${GraphQLApi.ApiId}
+      RetentionInDays: 14
+  GraphQLApiLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub gql-${ProjectName}-log
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  GraphQLApiLogRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref GraphQLApiLogRole
+      PolicyName: cloudwatch
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt GraphQLApiLogGroup.Arn
+  ################
+  # Data Sources #
+  ################
+  DatasourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub gql-${ProjectName}-datasource
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: appsync.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-lambda
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource:
+                  - !GetAtt AppsyncSourceFunction.Arn
+                  - !GetAtt AppsyncRustBenchSourceFunction.Arn
+                  - !GetAtt AppsyncPythonBenchSourceFunction.Arn
+      Path: /
+  BackendTableAccessRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncSourceFunctionRole
+        - !Ref AppsyncRustBenchSourceFunctionRole
+        - !Ref AppsyncPythonBenchSourceFunctionRole
+        - !Ref DatasourceRole
+      PolicyName: dynamodb
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: FullDataAccess
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${BackendTable}/index/*
+  BackendTableDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AMAZON_DYNAMODB
+      Name: backend_table
+      DynamoDBConfig:
+        AwsRegion: !Ref AWS::Region
+        TableName: !Ref BackendTable
+        UseCallerCredentials: false
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
+  AppsyncSourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-appsync-source
+      CodeUri: ../rust/lambdas/appsync-source
+      Role: !GetAtt AppsyncSourceFunctionRole.Arn
+  AppsyncSourceFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AppsyncSourceFunction}
+      RetentionInDays: 90
+  AppsyncSourceFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-appsync-source
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  AppsyncSourceFunctionRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncSourceFunctionRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt AppsyncSourceFunctionLogGroup.Arn
+  LambdaDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AWS_LAMBDA
+      Name: lambda_source
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt AppsyncSourceFunction.Arn
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
+  AppsyncRustBenchSourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-appsync-rust-bench-source
+      CodeUri: ../rust/lambdas/appsync-bench-source
+      Role: !GetAtt AppsyncRustBenchSourceFunctionRole.Arn
+  AppsyncRustBenchSourceFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AppsyncRustBenchSourceFunction}
+      RetentionInDays: 90
+  AppsyncRustBenchSourceFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-appsync-rust-bench-source
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  AppsyncRustBenchSourceFunctionRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncRustBenchSourceFunctionRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt AppsyncRustBenchSourceFunctionLogGroup.Arn
+  RustBenchLambdaDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AWS_LAMBDA
+      Name: rust_bench_lambda_source
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt AppsyncRustBenchSourceFunction.Arn
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
+  AppsyncPythonBenchSourceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-appsync-python-bench-source
+      Runtime: python3.13
+      Handler: index.lambda_handler
+      CodeUri: ../python/lambdas/appsync-bench-source
+      Role: !GetAtt AppsyncPythonBenchSourceFunctionRole.Arn
+  AppsyncPythonBenchSourceFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AppsyncPythonBenchSourceFunction}
+      RetentionInDays: 90
+  AppsyncPythonBenchSourceFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-appsync-python-bench-source
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  AppsyncPythonBenchSourceFunctionRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref AppsyncPythonBenchSourceFunctionRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt AppsyncPythonBenchSourceFunctionLogGroup.Arn
+  PythonBenchLambdaDatasource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt GraphQLApi.ApiId
+      Type: AWS_LAMBDA
+      Name: python_bench_lambda_source
+      LambdaConfig:
+        LambdaFunctionArn: !GetAtt AppsyncPythonBenchSourceFunction.Arn
+      ServiceRoleArn: !GetAtt DatasourceRole.Arn
+
+Outputs:
+  ApiUrl:
+    Description: The URL of the API
+    Value: !Sub https://${GraphQLApi.GraphQLDns}/graphql
+  ApiKey:
+    Description: The Public API key of the API
+    Value: !GetAtt GraphQLApiPublicKey.ApiKey

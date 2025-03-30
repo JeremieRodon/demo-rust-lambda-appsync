@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: The S3 bucket and the Cloudfront distribution of the static website
+
+Parameters:
+  ProjectName:
+    Type: String
+
+Resources:
+  ############################
+  # S3 Static Website Bucket #
+  ############################
+  StaticWebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-${AWS::AccountId}-${AWS::Region}-website
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteTaggedAfter1Day
+            Status: Enabled
+            TagFilters:
+              - Key: need-to-delete
+                Value: "true"
+            ExpirationInDays: 1
+          - Id: AbortMultipart
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+  StaticWebBucketEmptier:
+    Type: Custom::BucketEmptier
+    Properties:
+      ServiceToken:
+        {
+          Fn::ImportValue: !Sub "CustomResource:${ProjectName}:S3BucketEmptier",
+        }
+      BucketName: !Ref StaticWebBucket
+  StaticWebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticWebBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::${StaticWebBucket}/*
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}
+  CleanupS3Lambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-cleanup-s3
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      MemorySize: 128
+      Architectures:
+        - arm64
+      Events:
+        TriggerEvent:
+          Type: S3
+          Properties:
+            Bucket: !Ref StaticWebBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: index.html
+      Description: Called to cleanup old deployment and remove sensible metadata.
+      CodeUri: ../python/lambdas/cleanup-s3
+      Timeout: 300
+      Role: !GetAtt CleanupS3LambdaRole.Arn
+  CleanupS3LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${CleanupS3Lambda}
+      RetentionInDays: 90
+  CleanupS3LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-cleanup-s3
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  CleanupS3LambdaRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref CleanupS3LambdaRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt CleanupS3LambdaLogGroup.Arn
+  CleanupS3LambdaWorkPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref CleanupS3LambdaRole
+      PolicyName: work-rights
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObjectTagging
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${StaticWebBucket}
+              - !Sub arn:${AWS::Partition}:s3:::${StaticWebBucket}/*
+  ###########################
+  # Cloudfront Distribution #
+  ###########################
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: !Sub Access to static content on S3 bucket ${StaticWebBucket}
+        Name: !Sub oac-${ProjectName}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+  CloudFrontResponseHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub cfrhp-${ProjectName}-default
+        Comment: Response headers policy with security headers and removing S3 Metadata
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: SAMEORIGIN
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+          XSSProtection:
+            ModeBlock: true
+            Protection: true
+            Override: true
+        RemoveHeadersConfig:
+          Items:
+            - Header: X-Amz-Meta-Codebuild-Buildarn
+            - Header: X-Amz-Meta-Codebuild-Content-Md5
+            - Header: X-Amz-Meta-Codebuild-Content-Sha256
+            - Header: X-Amz-Server-Side-Encryption
+            - Header: Etag
+            - Header: Server
+            - Header: Date
+            - Header: Last-Modified
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultCacheBehavior:
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6 # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref CloudFrontResponseHeadersPolicy
+          Compress: true
+          TargetOriginId: s3-bucket
+          ViewerProtocolPolicy: redirect-to-https
+        # We are serving a single page app
+        # Technically the only valid path in S3 is /index.html but people could
+        # and will come to the website with path like /devices or /whatever
+        # Paths that are part of the SPA JS router but do not actually exist in S3
+        # Those path will trigger an error from S3 and we don't want that to be forwarded
+        # Therefor, we tell CloudFront that in case of error from S3, it should just serve the
+        # home path /index.html
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403 # Seems that we never get 404 but instead we get 403. Probably a S3 thing
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        IPV6Enabled: true
+        # Logging:
+        # Logging
+        Origins:
+          - Id: s3-bucket
+            DomainName: !GetAtt StaticWebBucket.RegionalDomainName
+            OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+            S3OriginConfig: {}
+        PriceClass: PriceClass_100
+
+Outputs:
+  StaticWebBucket:
+    Description: Name of the web bucket containing the website
+    Value: !Ref StaticWebBucket
+  WebsiteDomainName:
+    Description: CloudFront domainname of the website
+    Value: !GetAtt CloudFrontDistribution.DomainName

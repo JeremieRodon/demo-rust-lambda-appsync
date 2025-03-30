@@ -1,0 +1,17 @@
+[package]
+name = "appsync-bench-source"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+
+[dependencies]
+dynamodb_utils = { path = "../../libs/dynamodb_utils" }
+lambda-appsync = { workspace = true }
+aws-sdk-dynamodb = { workspace = true }
+
+serde = { workspace = true }
+serde_dynamo = { workspace = true }
+
+thiserror = { workspace = true }

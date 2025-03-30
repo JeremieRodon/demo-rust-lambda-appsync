@@ -1,0 +1,134 @@
+# Root schema definition specifying available operations
+schema {
+    query: Query
+    mutation: Mutation
+    subscription: Subscription
+}
+
+# Queries that can be performed to retrieve data
+type Query {
+    # Get list of all players in the game
+    players: [Player!]!
+        @aws_cognito_user_pools(cognito_groups: ["Admins"])
+        @aws_api_key
+    # Get current game status (started/stopped/reset)
+    gameStatus: GameStatus!
+        @aws_cognito_user_pools(cognito_groups: ["Admins"])
+        @aws_api_key
+}
+
+# Mutations to modify game state and player data
+type Mutation {
+    # Start a new game round
+    startGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    # Stop the current game round
+    stopGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    # Reset the game state and clear all player statistics
+    resetGame: GameStatus! @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    # Remove a player from the game
+    removePlayer(player_id: ID!): Player!
+        @aws_cognito_user_pools(cognito_groups: ["Admins"])
+    # Register a new player with name and secret key
+    registerNewPlayer(name: String!, secret: String!): Player! @aws_api_key
+    # Update an existing player's name
+    updatePlayerName(
+        player_id: ID!
+        new_name: String!
+        secret: String!
+    ): Player! @aws_api_key
+    # Record a click for a player of the Rust team
+    clickRust(player_id: ID!, secret: String!): Player! @aws_api_key
+    # Record a click for a player of the Python team
+    clickPython(player_id: ID!, secret: String!): Player! @aws_api_key
+    # Record a click for a player of the JS team
+    clickJs(player_id: ID!, secret: String!): Player! @aws_api_key
+    # Record a click for a player of the VTL team
+    clickVtl(player_id: ID!, secret: String!): Player! @aws_api_key
+    # Submit latency report for a player of the Rust team
+    reportLatencyRust(
+        player_id: ID!
+        report: LatencyReport!
+        secret: String!
+    ): Player! @aws_api_key
+    # Submit latency report for a player of the Python team
+    reportLatencyPython(
+        player_id: ID!
+        report: LatencyReport!
+        secret: String!
+    ): Player! @aws_api_key
+    # Submit latency report for a player of the JS team
+    reportLatencyJs(
+        player_id: ID!
+        report: LatencyReport!
+        secret: String!
+    ): Player! @aws_api_key
+    # Submit latency report for a player of the VTL team
+    reportLatencyVtl(
+        player_id: ID!
+        report: LatencyReport!
+        secret: String!
+    ): Player! @aws_api_key
+}
+
+# Subscriptions to receive real-time updates
+type Subscription {
+    # Subscribe to all the "Player" type updates (clicks, name changes, etc)
+    updatedPlayer: Player
+        @aws_cognito_user_pools(cognito_groups: ["Admins"])
+        @aws_api_key
+        @aws_subscribe(
+            mutations: [
+                "registerNewPlayer"
+                "updatePlayerName"
+                "clickRust"
+                "clickPython"
+                "clickJs"
+                "clickVtl"
+                "reportLatencyRust"
+                "reportLatencyPython"
+                "reportLatencyJs"
+                "reportLatencyVtl"
+            ]
+        )
+    # Subscribe to player removals
+    removedPlayer: Player
+        @aws_cognito_user_pools(cognito_groups: ["Admins"])
+        @aws_api_key
+        @aws_subscribe(mutations: ["removePlayer"])
+    # Subscribe to game status changes
+    updatedGameStatus: GameStatus
+        @aws_cognito_user_pools(cognito_groups: ["Admins"])
+        @aws_api_key
+        @aws_subscribe(mutations: ["startGame", "stopGame", "resetGame"])
+}
+
+# Game state enum
+enum GameStatus {
+    STARTED
+    STOPPED
+    RESET
+}
+
+# Teams that players can be part of
+enum Team {
+    RUST
+    PYTHON
+    JS
+    VTL
+}
+
+# Player type containing game metrics
+type Player @aws_cognito_user_pools(cognito_groups: ["Admins"]) @aws_api_key {
+    id: ID!
+    name: String!
+    team: Team!
+    clicks: Int
+    avg_latency: Float
+    avg_latency_clicks: Int
+}
+
+# Input type for latency report submissions
+input LatencyReport {
+    clicks: Int!
+    avg_latency: Float!
+}

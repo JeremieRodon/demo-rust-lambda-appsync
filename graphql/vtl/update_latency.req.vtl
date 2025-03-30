@@ -1,0 +1,60 @@
+#set( $clicks = $ctx.args.report.clicks )
+#set( $avg_latency = $ctx.args.report.avg_latency )
+## $ctx.prev.result == player
+#set( $old_avg_latency = $ctx.prev.result.avg_latency )
+#set( $old_avg_latency_clicks = $ctx.prev.result.avg_latency_clicks )
+#if($old_avg_latency)
+#set( $has_previous_values = true )
+#else
+#set( $has_previous_values = false )
+#end
+
+#if($has_previous_values)
+#set( $old_total_latency = $old_avg_latency * $old_avg_latency_clicks )
+#else
+#set( $old_total_latency = 0.0 )
+#end
+#set( $new_total_latency = $old_total_latency + $avg_latency * $clicks )
+
+#if($has_previous_values)
+#set( $new_avg_latency_clicks = $old_avg_latency_clicks + $clicks )
+#else
+#set( $new_avg_latency_clicks = $clicks )
+#end
+
+#set( $new_avg_latency = $new_total_latency / $new_avg_latency_clicks )
+
+#if($has_previous_values)
+#set( $condition = {
+    "expression": "attribute_exists(PK) AND secret = :secret AND #avg_latency = :old_avg_latency AND #avg_latency_clicks = :old_avg_latency_clicks",
+    "expressionValues": {
+        ":old_avg_latency": $util.parseJson($util.dynamodb.toDynamoDBJson($old_avg_latency)),
+        ":old_avg_latency_clicks": $util.parseJson( $util.dynamodb.toDynamoDBJson($old_avg_latency_clicks))
+    }
+})
+#else
+#set( $condition = {
+    "expression": "attribute_exists(PK) AND secret = :secret AND attribute_not_exists(#avg_latency) AND attribute_not_exists(#avg_latency_clicks)"
+})
+#end
+
+{
+    "version": "2017-02-28",
+    "operation": "UpdateItem",
+    "key": {
+        "PK": $util.dynamodb.toDynamoDBJson("PLAYER#${ctx.args.player_id}"),
+    },
+    "update": {
+        "expression": "SET #avg_latency = :new_avg_latency, #avg_latency_clicks = :new_avg_latency_clicks",
+        "expressionNames": {
+            "#avg_latency": "avg_latency",
+            "#avg_latency_clicks": "avg_latency_clicks"
+        },
+        "expressionValues": {
+            ":new_avg_latency": $util.dynamodb.toDynamoDBJson($new_avg_latency),
+            ":new_avg_latency_clicks": $util.dynamodb.toDynamoDBJson($new_avg_latency_clicks),
+            ":secret": $util.dynamodb.toDynamoDBJson($ctx.args.secret)
+        }
+    },
+    "condition": $util.toJson($condition)
+}

@@ -1,0 +1,490 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: CodePipeline pipeline for the demo
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: Name of the project to insert in all resources names (3-25 chars, only lowercases, numbers and dashes, must not begin by a number or a dash, must not end with a dash)
+    Default: "benchmark-game"
+    AllowedPattern: ^[a-z][a-z0-9-]{1,23}[a-z0-9]$
+  CodeStarConnectionArn:
+    Type: String
+    Description: The ARN of the CodeStart connection to GitHub, follow the Get Started on https://github.com/JeremieRodon/demo-rust-lambda-appsync.git
+  ForkedRepoId:
+    Type: String
+    Description: The ID of the FORKED repository in YOUR GitHub account, probably <YourGithubUserName>/demo-rust-lambda-appsync
+  BranchName:
+    Type: String
+    Description: The name of the branch to track
+    Default: "master"
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: Repository connection
+        Parameters:
+          - CodeStarConnectionArn
+          - ForkedRepoId
+          - BranchName
+      - Label: Project
+        Parameters:
+          - ProjectName
+    ParameterLabels:
+      ProjectName: Name
+      CodeStarConnectionArn: CodeStar Connection ARN
+      ForkedRepoId: Repository Id
+      BranchName: Branch Name
+
+Resources:
+  #############
+  # Artifacts #
+  #############
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeletePipelineArtifactsAfter1Day
+            Status: Enabled
+            Prefix: release-
+            ExpirationInDays: 1
+          - Id: DeleteOldVersionAfter1Day
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+            ExpiredObjectDeleteMarker: true
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: TransitToIT
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 0
+                StorageClass: INTELLIGENT_TIERING
+  ArtifactBucketEmptier:
+    Type: Custom::BucketEmptier
+    DependsOn:
+      - BucketEmptierLambdaRole
+      - BucketEmptierLambdaRoleBasicPolicy
+      - BucketEmptierLambdaWorkPolicy
+      - BucketEmptierLambdaLogGroup
+    Properties:
+      ServiceToken: !GetAtt BucketEmptierLambda.Arn
+      BucketName: !Ref ArtifactBucket
+  BucketEmptierLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-s3-bucket-emptier
+      Description: Called by a CF Custom Resource to empty an S3 bucket before destroying it
+      Handler: index.lambda_handler
+      Runtime: python3.13
+      MemorySize: 128
+      Architectures:
+        - arm64
+      InlineCode: |
+        import boto3
+        import cfnresponse
+        def lambda_handler(event, context):
+          try:
+            bucket_name = event['ResourceProperties']['BucketName']
+            physical_id = f"EMPTIER_{bucket_name}"
+            if event['RequestType'] == 'Delete':
+              bucket = boto3.resource('s3').Bucket(bucket_name)
+              bucket.object_versions.delete()
+            cfnresponse.send(event, context, cfnresponse.SUCCESS, {}, physical_id)
+          except Exception as e:
+            cfnresponse.send(event, context, cfnresponse.FAILED, {'Data': str(e)}, physical_id)
+      Timeout: 900
+      Role: !GetAtt BucketEmptierLambdaRole.Arn
+  BucketEmptierLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${BucketEmptierLambda}
+      RetentionInDays: 90
+  BucketEmptierLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub lambda-${ProjectName}-s3-bucket-emptier
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  BucketEmptierLambdaRoleBasicPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref BucketEmptierLambdaRole
+      PolicyName: basic-lambda
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !GetAtt BucketEmptierLambdaLogGroup.Arn
+  BucketEmptierLambdaWorkPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref BucketEmptierLambdaRole
+      PolicyName: work-rights
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:DeleteObject
+              - s3:DeleteObjectVersion
+              - s3:ListBucket
+              - s3:ListBucketVersions
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-artifac/*
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website
+              - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website/*
+  ###############
+  # Build Infra #
+  ###############
+  InfraBuildProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn:
+      - ArtifactBucketEmptier
+      - InfraBuildProjectLogGroup
+    Properties:
+      Name: !Sub cbp-${ProjectName}-infra-builder
+      Description: !Sub Project building infra for the project ${ProjectName}
+      ServiceRole: !GetAtt BuildProjectsRole.Arn
+      Environment:
+        Type: ARM_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux-aarch64-standard:3.0
+        EnvironmentVariables:
+          - Name: ARTIFACT_BUCKET
+            Value: !Ref ArtifactBucket
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: ./ci-config/buildspec.yml
+      Artifacts:
+        Type: CODEPIPELINE
+      Cache:
+        Type: S3
+        Location: !Sub ${ArtifactBucket}/codebuildcache/cbp-${ProjectName}-infra-builder
+      TimeoutInMinutes: 60
+      Tags:
+        - Key: Name
+          Value: !Sub cbp-${ProjectName}-infra-builder
+  InfraBuildProjectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/cbp-${ProjectName}-infra-builder
+      RetentionInDays: 14
+  #################
+  # Build Website #
+  #################
+  WebsiteBuildProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn:
+      - ArtifactBucketEmptier
+      - WebsiteBuildProjectLogGroup
+    Properties:
+      Name: !Sub cbp-${ProjectName}-website-builder
+      Description: !Sub Project compiling static website for the project ${ProjectName}
+      ServiceRole: !GetAtt BuildProjectsRole.Arn
+      Environment:
+        Type: ARM_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux-aarch64-standard:3.0
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: ./buildspec.yml
+      Artifacts:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 30
+      Tags:
+        - Key: Name
+          Value: !Sub cbp-${ProjectName}-website-builder
+  WebsiteBuildProjectLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/codebuild/cbp-${ProjectName}-website-builder
+      RetentionInDays: 14
+
+  BuildProjectsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub codebuild-${ProjectName}
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+  BuildProjectsRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      Roles:
+        - !Ref BuildProjectsRole
+      PolicyName: policy-codebuild
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:DeleteObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:${AWS::Partition}:s3:::${ArtifactBucket}
+              - !Sub arn:${AWS::Partition}:s3:::${ArtifactBucket}/*
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !GetAtt InfraBuildProjectLogGroup.Arn
+              - !GetAtt WebsiteBuildProjectLogGroup.Arn
+
+  ############
+  # Pipeline #
+  ############
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub codepipeline-${ProjectName}
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: policy-codepipeline
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: codestar-connections:UseConnection
+                Resource: !Ref CodeStarConnectionArn
+              - Effect: Allow
+                Action:
+                  - codepipeline:*
+                  - iam:ListRoles
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                  - cloudformation:Describe*
+                  - cloudFormation:List*
+                  - cloudformation:CreateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:UpdateStack
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:SetStackPolicy
+                  - cloudformation:ValidateTemplate
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${ArtifactBucket}
+                  - !Sub arn:${AWS::Partition}:s3:::${ArtifactBucket}/*
+                  - !Sub arn:${AWS::Partition}:s3:::${ProjectName}-${AWS::AccountId}-${AWS::Region}-website/*
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: "*"
+                Condition:
+                  StringEqualsIfExists:
+                    "iam:PassedToService":
+                      - cloudformation.amazonaws.com
+      Path: /
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    DependsOn:
+      - ArtifactBucketEmptier
+      - BuildProjectsRolePolicy
+    Properties:
+      RoleArn: !GetAtt PipelineRole.Arn
+      Name: !Sub release-${ProjectName}
+      PipelineType: V2
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Checkout
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeStarSourceConnection
+              Configuration:
+                ConnectionArn: !Ref CodeStarConnectionArn
+                FullRepositoryId: !Ref ForkedRepoId
+                BranchName: !Ref BranchName
+                DetectChanges: true
+              OutputArtifacts:
+                - Name: Sources
+              RunOrder: 1
+        - Name: BuildInfra
+          Actions:
+            - Name: BuildInfra
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref InfraBuildProject
+              RunOrder: 1
+              InputArtifacts:
+                - Name: Sources
+              OutputArtifacts:
+                - Name: Infra
+                - Name: Website
+        - Name: DeployInfra
+          Actions:
+            - Name: DeployInfra
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ChangeSetName: Deploy
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub root-stack-${ProjectName}
+                Capabilities: CAPABILITY_NAMED_IAM,CAPABILITY_AUTO_EXPAND
+                OutputFileName: infra.outputs.json
+                TemplatePath: Infra::demo-root-template.yml
+                ParameterOverrides: !Sub '{"ProjectName": "${ProjectName}"}'
+                RoleArn: !GetAtt CFDeployerRole.Arn
+              InputArtifacts:
+                - Name: Infra
+              OutputArtifacts:
+                - Name: DeployInfraOutput
+              RunOrder: 1
+        - Name: BuildWebsite
+          Actions:
+            - Name: BuildWebsite
+              Namespace: BuildWebsite
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref WebsiteBuildProject
+                PrimarySource: Website
+              RunOrder: 1
+              InputArtifacts:
+                - Name: Website
+                - Name: DeployInfraOutput
+              OutputArtifacts:
+                - Name: StaticContent
+                - Name: DynamicContent
+        - Name: DeployWebsite
+          Actions:
+            - Name: DeployStaticWebsite
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Configuration:
+                BucketName: "#{BuildWebsite.STATIC_WEB_BUCKET}"
+                Extract: true
+                CacheControl: public, max-age=604800, immutable
+              InputArtifacts:
+                - Name: StaticContent
+              RunOrder: 1
+            - Name: DeployDynamicWebsite
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: S3
+              Configuration:
+                BucketName: "#{BuildWebsite.STATIC_WEB_BUCKET}"
+                Extract: true
+                CacheControl: public, max-age=300, must-revalidate
+              InputArtifacts:
+                - Name: DynamicContent
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+
+  ##################################
+  # CloudFormation deployment role #
+  ##################################
+  CFDeployerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub role-${ProjectName}-CF-Deployer
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub policy-${ProjectName}-CF-Deployer
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: ReadArtifacts
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${ArtifactBucket}/*
+              - Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:RollbackStack
+                  - cloudformation:DeleteStack
+                Resource: !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/root-stack-${ProjectName}*
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                  - iam:*Role*
+                  - logs:*
+                  - s3:*Bucket*
+                  - s3:*Configuration
+                  - cloudfront:*
+                  - dynamodb:*
+                  - appsync:*
+                  - cognito-idp:*
+                Resource: "*"
+      Path: /
+
+Outputs:
+  CustomResourceBucketEmptier:
+    Description: Arn of the Lambda used as a CFN Custom Resource to empty buckets
+    Value: !GetAtt BucketEmptierLambda.Arn
+    Export:
+      Name: !Sub CustomResource:${ProjectName}:S3BucketEmptier

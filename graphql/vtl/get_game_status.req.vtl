@@ -1,0 +1,7 @@
+## Template is simple and does not depends on request args
+{
+    "operation": "GetItem",
+    "key": {
+        "PK": $util.dynamodb.toDynamoDBJson("GAME_STATUS"),
+    }
+}

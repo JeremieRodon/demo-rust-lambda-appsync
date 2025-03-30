@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: The Cognito userpool and client for the project
+
+Parameters:
+  ProjectName:
+    Type: String
+  WebsiteDomainName:
+    Type: String
+    Description: The domain name of our website to deploy
+
+Resources:
+  #####################
+  # Cognito User Pool #
+  #####################
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub cup-${ProjectName}
+      UserPoolTier: ESSENTIALS
+      Schema:
+        - Name: email
+          Required: true
+          Mutable: false
+      UsernameAttributes:
+        - email
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 2
+        SignInPolicy:
+          AllowedFirstAuthFactors:
+            - PASSWORD
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+  DefaultUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref ProjectName
+      ManagedLoginVersion: 2
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Ref ProjectName
+      UserPoolId: !Ref UserPool
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      AllowedOAuthFlows:
+        - code
+      AuthSessionValidity: 5
+      AccessTokenValidity: 8
+      IdTokenValidity: 8
+      RefreshTokenValidity: 365
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      EnableTokenRevocation: true
+      DefaultRedirectURI: !Sub https://${WebsiteDomainName}
+      CallbackURLs:
+        - !Sub https://${WebsiteDomainName}
+        - !Sub https://${WebsiteDomainName}/
+        - http://localhost:3000
+        - http://localhost:3000/
+      LogoutURLs:
+        - !Sub https://${WebsiteDomainName}
+        - !Sub https://${WebsiteDomainName}/
+        - http://localhost:3000
+        - http://localhost:3000/
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+  ManagedLogin:
+    Type: AWS::Cognito::ManagedLoginBranding
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientId: !Ref UserPoolClient
+      ReturnMergedResources: true
+      UseCognitoProvidedValues: true
+      # Settings: Json
+      # Assets:
+      #   - AssetType
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: Admins
+      Description: Admins can manage everything
+
+Outputs:
+  CognitoUserPoolId:
+    Description: The Cognito UserPool ID
+    Value: !Ref UserPool
+  CognitoUserPoolClientId:
+    Description: ID of the User Pool Client
+    Value: !Ref UserPoolClient
+  CognitoDomainName:
+    Description: Domain of Cognito
+    Value: !Sub ${ProjectName}.auth.${AWS::Region}.amazoncognito.com

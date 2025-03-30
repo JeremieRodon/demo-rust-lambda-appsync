@@ -1,0 +1,21 @@
+[workspace]
+members = ["rust/lambdas/*", "rust/libs/*", "utils/simulate_players"]
+resolver = "2"
+
+[workspace.package]
+rust-version = "1.85.0"
+edition = "2024"
+authors = ["Jérémie RODON <jeremie.rodon@gmail.com>"]
+license = "MIT"
+
+[workspace.dependencies]
+lambda-appsync = { version = "0.1" }
+
+aws-sdk-dynamodb = { version = "1.59" }
+serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
+
+tokio = { version = "1", features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+
+thiserror = "1.0"
+log = "0.4"
