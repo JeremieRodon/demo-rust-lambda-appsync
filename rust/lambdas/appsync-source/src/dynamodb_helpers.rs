@@ -277,7 +277,7 @@ pub async fn dynamodb_query_players() -> Result<Vec<Player>, aws_sdk_dynamodb::E
 /// Retrieves the current game status from DynamoDB
 ///
 /// Returns the GameStatus enum value
-pub async fn dynamodb_get_game_status() -> Result<GameStatus, aws_sdk_dynamodb::Error> {
+pub async fn dynamodb_get_game_status() -> Result<Option<GameStatus>, aws_sdk_dynamodb::Error> {
     log::debug!("ENTER dynamodb_get_game_status");
 
     Ok(dynamodb()
@@ -287,6 +287,5 @@ pub async fn dynamodb_get_game_status() -> Result<GameStatus, aws_sdk_dynamodb::
         .send()
         .await?
         .item
-        .map(GameStatus::from_item)
-        .unwrap())
+        .map(GameStatus::from_item))
 }

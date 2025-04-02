@@ -42,7 +42,9 @@ pub async fn players() -> Result<Vec<Player>, AppsyncError> {
 // This macro replace the whole function by the code commented above
 #[appsync_operation(query(gameStatus))]
 pub async fn game_status() -> Result<GameStatus, AppsyncError> {
-    Ok(dynamodb_get_game_status().await?)
+    Ok(dynamodb_get_game_status()
+        .await?
+        .unwrap_or_else(|| GameStatus::Reset))
 }
 
 // This is a declarative macro that helps reduce boilerplate code for game status mutation operations.
