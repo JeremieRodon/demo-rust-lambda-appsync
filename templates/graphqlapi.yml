@@ -64,60 +64,64 @@ Resources:
               MaxBatchSize: 100
               MetricsConfig: ENABLED
 
-  ################################################################################################
-  #                                                                                              #
-  #                       Note on Enhanced Subscription Filters                                  #
-  #                       =====================================                                  #
-  #                                                                                              #
-  # If you want to use Enhanced Subscription filters (which this project does not),              #
-  # you must change the Response Mapping Template of the subscription you plan                   #
-  # to use Enhanced filters on.                                                                  #
-  #                                                                                              #
-  # The Response Mapping Template must be as follows:                                            #
-  #   `$extensions.setSubscriptionFilter($context.result.data)null`                              #
-  #                                                                                              #
-  # Below is an example of two CloudFormation loops that configure all your subscriptions        #
-  # to be 'Enhanced filter capable':                                                             #
-  #                                                                                              #
-  # ```yaml                                                                                      #
-  # # Note that the main loop does not declare subscription anymore                              #
-  # "Fn::ForEach::RustOps":                                                                      #
-  #   - OpType                                                                                   #
-  #   - [Query, Mutation]                                                                        #
-  #   - "Fn::ForEach::Op":                                                                       #
-  #       - Op                                                                                   #
-  #       - !FindInMap [AppSyncResolvers, Rust, !Ref OpType]                                     #
-  #       - "Rust${OpType}${Op}Resolver":                                                        #
-  #           Type: AWS::AppSync::Resolver                                                       #
-  #           DependsOn: GraphQLApiSchema                                                        #
-  #           Properties:                                                                        #
-  #             ApiId: !GetAtt GraphQLApi.ApiId                                                  #
-  #             DataSourceName: !GetAtt LambdaDatasource.Name                                    #
-  #             Kind: UNIT                                                                       #
-  #             TypeName: !Ref OpType                                                            #
-  #             FieldName: !Ref Op                                                               #
-  #             MaxBatchSize: 100                                                                #
-  #             MetricsConfig: ENABLED                                                           #
-  # # Instead this loop declares them                                                            #
-  # "Fn::ForEach::RustOpsSubscription":                                                          #
-  #   - Op                                                                                       #
-  #   - !FindInMap [AppSyncResolvers, Rust, Subscription]                                        #
-  #   - "RustSubscription${Op}Resolver":                                                         #
-  #       Type: AWS::AppSync::Resolver                                                           #
-  #       DependsOn: GraphQLApiSchema                                                            #
-  #       Properties:                                                                            #
-  #         ApiId: !GetAtt GraphQLApi.ApiId                                                      #
-  #         DataSourceName: !GetAtt LambdaDatasource.Name                                        #
-  #         Kind: UNIT                                                                           #
-  #         TypeName: Subscription                                                               #
-  #         FieldName: !Ref Op                                                                   #
-  #         MaxBatchSize: 100                                                                    #
-  #         MetricsConfig: ENABLED                                                               #
-  #         # Note the addition of the ResponseMappingTemplate                                   #
-  #         ResponseMappingTemplate: $extensions.setSubscriptionFilter($context.result.data)null #
-  # ```                                                                                          #
-  #                                                                                              #
-  ################################################################################################
+  #########################################################################################
+  #                                                                                       #
+  #                       Note on Enhanced Subscription Filters                           #
+  #                       =====================================                           #
+  #                                                                                       #
+  # If you want to use Enhanced Subscription filters (which this project does not),       #
+  # you must change the Response Mapping Template of the subscription you plan            #
+  # to use Enhanced filters on.                                                           #
+  #                                                                                       #
+  # The Response Mapping Template must be as follows:                                     #
+  #   `$extensions.setSubscriptionFilter($context.result.data)null`                       #
+  #                                                                                       #
+  # Below is an example of two CloudFormation loops that configure all your subscriptions #
+  # to be 'Enhanced filter capable':                                                      #
+  #                                                                                       #
+  # ```yaml                                                                               #
+  # # Note that the main loop does not declare subscription anymore                       #
+  # "Fn::ForEach::RustOps":                                                               #
+  #   - OpType                                                                            #
+  #   - [Query, Mutation]                                                                 #
+  #   - "Fn::ForEach::Op":                                                                #
+  #       - Op                                                                            #
+  #       - !FindInMap [AppSyncResolvers, Rust, !Ref OpType]                              #
+  #       - "Rust${OpType}${Op}Resolver":                                                 #
+  #           Type: AWS::AppSync::Resolver                                                #
+  #           DependsOn: GraphQLApiSchema                                                 #
+  #           Properties:                                                                 #
+  #             ApiId: !GetAtt GraphQLApi.ApiId                                           #
+  #             DataSourceName: !GetAtt LambdaDatasource.Name                             #
+  #             Kind: UNIT                                                                #
+  #             TypeName: !Ref OpType                                                     #
+  #             FieldName: !Ref Op                                                        #
+  #             MaxBatchSize: 100                                                         #
+  #             MetricsConfig: ENABLED                                                    #
+  # # Instead this loop declares them                                                     #
+  # "Fn::ForEach::RustOpsSubscription":                                                   #
+  #   - Op                                                                                #
+  #   - !FindInMap [AppSyncResolvers, Rust, Subscription]                                 #
+  #   - "RustSubscription${Op}Resolver":                                                  #
+  #       Type: AWS::AppSync::Resolver                                                    #
+  #       DependsOn: GraphQLApiSchema                                                     #
+  #       Properties:                                                                     #
+  #         ApiId: !GetAtt GraphQLApi.ApiId                                               #
+  #         DataSourceName: !GetAtt LambdaDatasource.Name                                 #
+  #         Kind: UNIT                                                                    #
+  #         TypeName: Subscription                                                        #
+  #         FieldName: !Ref Op                                                            #
+  #         MaxBatchSize: 100                                                             #
+  #         MetricsConfig: ENABLED                                                        #
+  #         # Note the addition of the ResponseMappingTemplate                            #
+  #         ResponseMappingTemplate: |                                                    #
+  #           #if($context.result.data)                                                   #
+  #           $extensions.setSubscriptionFilter($context.result.data)                     #
+  #           #end                                                                        #
+  #           null                                                                        #
+  # ```                                                                                   #
+  #                                                                                       #
+  #########################################################################################
 
   ##################################
   # Rust AppSync GraphQL Resolvers #
