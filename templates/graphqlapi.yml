@@ -470,7 +470,35 @@ Resources:
     Properties:
       ApiId: !GetAtt GraphQLApi.ApiId
       Description: Public Access Key to the API embedded in the front website
-      Expires: 1744236000 # 2025-04-09 22:00:00 TZ=Paris
+      Expires: !GetAtt ExpirationTimeFunction.Timestamp
+  ExpirationTimeFunction:
+    Type: Custom::Timestamp
+    Properties:
+      ServiceToken: !GetAtt TimestampLambda.Arn
+      DaysToAdd: 30
+  TimestampLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.9
+      Handler: index.handler
+      InlineCode: |
+        import datetime
+        import cfnresponse
+        def handler(event, context):
+            try:
+                if event['RequestType'] in ['Create', 'Update']:
+                    # Get current time and add specified days
+                    days_to_add = event['ResourceProperties'].get('DaysToAdd', 30)
+                    current_time = datetime.datetime.now()
+                    future_time = current_time + datetime.timedelta(days=int(days_to_add))
+                    # Convert to Unix timestamp
+                    timestamp = int(future_time.timestamp())
+                    response_data = {'Timestamp': timestamp}
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+                else:
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+            except Exception as e:
+                cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
   GraphQLApiSchema:
     Type: AWS::AppSync::GraphQLSchema
     Properties:
