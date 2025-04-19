@@ -148,9 +148,9 @@ pub async fn dynamodb_update_player_latency_stats(
     player_id: ID,
     secret: String,
     old_avg_latency: Option<f64>,
-    old_avg_latency_clicks: Option<i64>,
+    old_avg_latency_clicks: Option<i32>,
     new_avg_latency: f64,
-    new_avg_latency_clicks: i64,
+    new_avg_latency_clicks: i32,
 ) -> Result<Player, aws_sdk_dynamodb::Error> {
     log::debug!(
         "ENTER dynamodb_update_player_latency_stats - \
