@@ -473,13 +473,16 @@ Resources:
       Expires: !GetAtt ExpirationTimeFunction.Timestamp
   ExpirationTimeFunction:
     Type: Custom::Timestamp
+    DependsOn: TimestampFunctionLogGroup
     Properties:
-      ServiceToken: !GetAtt TimestampLambda.Arn
+      ServiceToken: !GetAtt TimestampFunction.Arn
       DaysToAdd: 30
-  TimestampLambda:
+  TimestampFunction:
     Type: AWS::Serverless::Function
+    DependsOn: TimestampFunctionLogGroup
     Properties:
-      Runtime: python3.9
+      FunctionName: !Sub ${ProjectName}-cfn-custom-timestamp
+      Runtime: python3.13
       Handler: index.handler
       InlineCode: |
         import datetime
@@ -499,6 +502,11 @@ Resources:
                     cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
             except Exception as e:
                 cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+  TimestampFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ProjectName}-cfn-custom-timestamp
+      RetentionInDays: 7
   GraphQLApiSchema:
     Type: AWS::AppSync::GraphQLSchema
     Properties:
