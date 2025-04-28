@@ -1511,9 +1511,9 @@ dependencies = [
 
 [[package]]
 name = "lambda-appsync"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccbfdfd122bbfb6c5b6bc2d86656c355759ae9fc56a0f21ad246aeff74b63743"
+checksum = "4876dbdd9167f7774daa70f9656132e659240d33bd56f6e9927e88881e78355c"
 dependencies = [
  "aws-config",
  "aws-smithy-types",
@@ -1530,9 +1530,9 @@ dependencies = [
 
 [[package]]
 name = "lambda-appsync-proc"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "894524815f5dad36abed95fb17307c196f6a1a4d6ca54e557f3da4f1ca0e7190"
+checksum = "7ec13433edd6145468b5a2c0bad7b36ed49ba542639620ef63cd0629dbfa739b"
 dependencies = [
  "graphql-parser",
  "proc-macro2",
